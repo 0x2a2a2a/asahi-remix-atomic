@@ -64,6 +64,8 @@ jobs:
             ./Containerfile
           build-args: |
             FEDORA_VERSION=${{ env.FEDORA_VERSION }}
+          labels: |
+            org.opencontainers.image.version=${{ env.IMAGE_VERSION }}
           annotations: |
             containers.bootc=1
             ostree.bootable=1
