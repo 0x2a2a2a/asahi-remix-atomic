@@ -1,0 +1,25 @@
+name: Cleanup old GHCR images
+
+on:
+  schedule:
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-24.04
+    permissions:
+      packages: write
+      contents: read
+
+    steps:
+      - name: Delete old container images
+        uses: snok/container-retention-policy@v3
+        with:
+          account: ${{ github.repository_owner }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          image-names: ${{ github.event.repository.name }}
+          image-tags: "!latest !wmx"
+          cut-off: 4w
+          keep-n-most-recent: 5
+          dry-run: false

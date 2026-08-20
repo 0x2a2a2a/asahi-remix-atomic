@@ -1,0 +1,121 @@
+name: Build and Push
+
+env:
+  REGISTRY: "ghcr.io"
+  IMAGE_NAME: "${{ github.repository }}"
+  FEDORA_VERSION: "44"
+
+on:
+  push:
+    branches:
+      - main
+
+  schedule:
+    - cron: '0 2 * * *'
+
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    name: Build and Push bootc image
+    runs-on: "ubuntu-24.04-arm"
+    timeout-minutes: 30
+
+    permissions:
+      packages: write
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Free disk space
+        uses: hastd/free-disk-space@v0.1.2
+        with:
+          exclude: |
+            /opt/hostedtoolcache/Python
+          swapoff: false
+          skip-if-available: "64G"
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set image version
+        run: |
+          IMAGE_VERSION="${FEDORA_VERSION}.$(date -u +%Y%m%d).${GITHUB_RUN_NUMBER}"
+          echo "IMAGE_VERSION=${IMAGE_VERSION}" >> "$GITHUB_ENV"
+
+      - name: Log in to GHCR
+        uses: redhat-actions/podman-login@v1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Base Image with Buildah
+        id: build
+        uses: redhat-actions/buildah-build@v3
+        with:
+          oci: true
+          image: ${{ env.IMAGE_NAME }}
+          tags: prechunk
+          containerfiles: |
+            ./Containerfile
+          build-args: |
+            FEDORA_VERSION=${{ env.FEDORA_VERSION }}
+          annotations: |
+            containers.bootc=1
+            ostree.bootable=1
+            org.opencontainers.image.version=${{ env.IMAGE_VERSION }}
+            org.opencontainers.image.base.name=minimal
+            org.opencontainers.image.description=Custom Bootc Image
+          buildah-image: quay.io/buildah/stable
+          extra-args: |
+            --cap-add=all
+            --device=/dev/fuse
+
+      - name: Chunk Image
+        id: chunk
+        run: |
+          IMAGE_REF="localhost/${IMAGE_NAME}:prechunk"
+          podman inspect "${IMAGE_REF}" > config_ref.json
+
+          mkdir out
+          podman run --rm "--mount=type=image,src=${IMAGE_REF},target=/chunkah" \
+              -v "./config_ref.json:/config_ref.json" \
+              -v "./out:/run/out" \
+              quay.io/coreos/chunkah:latest build \
+              --verbose \
+              --max-layers 128 \
+              --config /config_ref.json \
+              --tag "${IMAGE_NAME}:wmx" \
+              --annotation org.opencontainers.image.base.digest- \
+              --label io.buildah.version- \
+              --output oci:/run/out/chunked
+
+      - name: Push Bootc Image
+        id: push
+        run: |
+          skopeo copy \
+              --authfile "${REGISTRY_AUTH_FILE}" \
+              --retry-times 3 \
+              --dest-compress-format zstd \
+              "oci:./out/chunked" \
+              "docker://${REGISTRY}/${IMAGE_NAME}:wmx"
+
+          DIGEST=$(skopeo inspect --authfile "${REGISTRY_AUTH_FILE}" \
+              "docker://${REGISTRY}/${IMAGE_NAME}:wmx" | jq -r '.Digest')
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+
+          skopeo copy \
+              --authfile "${REGISTRY_AUTH_FILE}" \
+              --retry-times 3 \
+              "docker://${REGISTRY}/${IMAGE_NAME}@${DIGEST}" \
+              "docker://${REGISTRY}/${IMAGE_NAME}:wmx.${IMAGE_VERSION}"
+
+      - name: Sign image with cosign (keyless)
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+        run: |
+          cosign sign --yes "${REGISTRY}/${IMAGE_NAME}@${{ steps.push.outputs.digest }}"
