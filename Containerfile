@@ -64,7 +64,8 @@ dnf -y install \
   exfatprogs \
   hfsplus-tools \
   fuse-overlayfs \
-  usbutils
+  usbutils \
+  ly
 
 # asahi support
 dnf -y install \
