@@ -1,7 +1,7 @@
 ARG FEDORA_VERSION
 FROM quay.io/fedora/fedora-bootc:${FEDORA_VERSION} AS builder
 RUN dnf -y install 'dnf5-plugins' && \
-    dnf -y copr enable @asahi/fedora-remix-branding \
+    dnf -y copr enable @asahi/fedora-remix-branding && \
     dnf -y install asahi-repos
 
 RUN /usr/libexec/bootc-base-imagectl build-rootfs \
