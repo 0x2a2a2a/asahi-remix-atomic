@@ -35,9 +35,10 @@ dnf copr enable -y lihaohong/yazi
 dnf copr enable -y alternateved/keyd
 
 # base tool & sys mgr
-dnf -y install \
+dnf -y install --setopt=install_weak_deps=False \
   attr \
   bash-completion \
+  busybox \
   hostname \
   iproute \
   jq \
@@ -64,8 +65,18 @@ dnf -y install \
   exfatprogs \
   hfsplus-tools \
   fuse-overlayfs \
+  udftools \
+  squashfs-tools \
   usbutils \
   ly
+
+# virt & pm
+dnf -y install --setopt=install_weak_deps=False \
+  slirp4netns \
+  systemd-container \
+  distrobox \
+  nix \
+  nix-daemon
 
 # asahi support
 dnf -y install \
@@ -73,13 +84,15 @@ dnf -y install \
   asahi-platform-metapackage-desktop \
   asahi-platform-metapackage-mesa
 
-# virt & pm
+# freedesktop
 dnf -y install \
-  slirp4netns \
-  systemd-container \
-  distrobox \
-  nix \
-  nix-daemon
+  xdg-desktop-portal \
+  xdg-desktop-portal-hyprland \
+  xdg-desktop-portal-gtk \
+  xdg-utils \
+  xdg-user-dirs \
+  dbus-tools \
+  mailcap
 
 # i18n & fonts
 dnf -y install \
@@ -105,7 +118,7 @@ dnf -y install \
   terminus-fonts-console
 
 # cli
-dnf -y install \
+dnf -y install --setopt=install_weak_deps=False \
   git-core \
   wget2-wget \
   fd-find \
@@ -122,17 +135,25 @@ dnf -y install \
   strace \
   ltrace
 
-# shell & terminal
+# wayland
 dnf -y install \
-  zsh \
-  alacritty \
-  foot \
-  fastfetch \
-  btop \
-  ncdu
+  waybar \
+  fuzzel \
+  mako \
+  cliphist \
+  wl-clipboard \
+  cage
+
+# qt & gtk theme
+dnf -y install --setopt=install_weak_deps=False \
+  qt6ct \
+  qt6-qtwayland \
+  qt5-qtwayland \
+  nwg-look \
+  dconf
 
 # power
-dnf -y install \
+dnf -y install --setopt=install_weak_deps=False \
   kernel-tools \
   tuned \
   tuned-ppd \
@@ -140,7 +161,8 @@ dnf -y install \
   upower \
   pavucontrol \
   brightnessctl \
-  keyd
+  keyd \
+  playerctl
 
 # hyprland
 dnf -y install --setopt=install_weak_deps=False \
@@ -155,32 +177,14 @@ dnf -y install --setopt=install_weak_deps=False \
   hyprshot \
   hyprcursor
 
-# freedesktop
+# shell & terminal
 dnf -y install \
-  xdg-desktop-portal \
-  xdg-desktop-portal-hyprland \
-  xdg-desktop-portal-gtk \
-  xdg-utils \
-  xdg-user-dirs \
-  dbus-tools \
-  mailcap
-
-# wayland
-dnf -y install \
-  waybar \
-  fuzzel \
-  mako \
-  cliphist \
-  wl-clipboard \
-  cage
-
-# qt & gtk theme
-dnf -y install \
-  qt6ct \
-  qt6-qtwayland \
-  qt5-qtwayland \
-  nwg-look \
-  dconf
+  zsh \
+  alacritty \
+  foot \
+  fastfetch \
+  btop \
+  ncdu
 
 # ime
 dnf -y install \
@@ -192,17 +196,18 @@ dnf -y install \
   luajit
 
 # fm
-dnf -y install \
+dnf -y install --setopt=install_weak_deps=False \
   thunar \
   thunar-volman \
   thunar-media-tags-plugin \
   thunar-archive-plugin \
   xarchiver \
   7zip \
+  7zip-standalone \
   unzip
 
 # browser
-dnf -y install \
+dnf -y install --setopt=install_weak_deps=False \
   chromium \
   firefox \
   firefox-langpacks
@@ -216,7 +221,6 @@ dnf -y install \
 dnf -y install \
   plymouth \
   plymouth-system-theme
-
 
 semanage fcontext -a -t xdm_exec_t "/usr/bin/ly"
 
