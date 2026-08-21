@@ -4,6 +4,7 @@ env:
   REGISTRY: "ghcr.io"
   IMAGE_NAME: "${{ github.repository }}"
   FEDORA_VERSION: "44"
+  REL_TAG: "wmx"
 
 on:
   push:
@@ -43,7 +44,7 @@ jobs:
 
       - name: Set image version
         run: |
-          IMAGE_VERSION="${FEDORA_VERSION}.$(date -u +%Y%m%d).${GITHUB_RUN_NUMBER}"
+          IMAGE_VERSION="${FEDORA_VERSION}.$(date -u +%Y%m%d).0"
           echo "IMAGE_VERSION=${IMAGE_VERSION}" >> "$GITHUB_ENV"
 
       - name: Log in to GHCR
@@ -53,7 +54,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build Base Image with Buildah
+      - name: Build Image with Buildah
         id: build
         uses: redhat-actions/buildah-build@v3
         with:
@@ -65,19 +66,21 @@ jobs:
           build-args: |
             FEDORA_VERSION=${{ env.FEDORA_VERSION }}
           labels: |
+            containers.bootc=1
+            ostree.bootable=1
             org.opencontainers.image.version=${{ env.IMAGE_VERSION }}
+            org.opencontainers.image.description=Custom Bootc Image
           annotations: |
             containers.bootc=1
             ostree.bootable=1
             org.opencontainers.image.version=${{ env.IMAGE_VERSION }}
-            org.opencontainers.image.base.name=minimal
             org.opencontainers.image.description=Custom Bootc Image
           buildah-image: quay.io/buildah/stable
           extra-args: |
             --cap-add=all
             --device=/dev/fuse
 
-      - name: Chunk Image
+      - name: Chunk Image with Chunkah
         id: chunk
         run: |
           IMAGE_REF="localhost/${IMAGE_NAME}:prechunk"
@@ -91,8 +94,9 @@ jobs:
               --verbose \
               --max-layers 128 \
               --config /config_ref.json \
-              --tag "${IMAGE_NAME}:wmx" \
+              --tag "${IMAGE_NAME}:${REL_TAG}" \
               --annotation org.opencontainers.image.base.digest- \
+              --annotation org.opencontainers.image.base.name- \
               --label io.buildah.version- \
               --output oci:/run/out/chunked
 
@@ -104,20 +108,17 @@ jobs:
               --retry-times 3 \
               --dest-compress-format zstd \
               "oci:./out/chunked" \
-              "docker://${REGISTRY}/${IMAGE_NAME}:wmx"
-
-          DIGEST=$(skopeo inspect --authfile "${REGISTRY_AUTH_FILE}" \
-              "docker://${REGISTRY}/${IMAGE_NAME}:wmx" | jq -r '.Digest')
-          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
-
+              "docker://${REGISTRY}/${IMAGE_NAME}:${REL_TAG}"
           skopeo copy \
               --authfile "${REGISTRY_AUTH_FILE}" \
               --retry-times 3 \
-              "docker://${REGISTRY}/${IMAGE_NAME}@${DIGEST}" \
-              "docker://${REGISTRY}/${IMAGE_NAME}:wmx.${IMAGE_VERSION}"
+              --dest-compress-format zstd \
+              "docker://${REGISTRY}/${IMAGE_NAME}:${REL_TAG}" \
+              "docker://${REGISTRY}/${IMAGE_NAME}:${REL_TAG}.${IMAGE_VERSION}"
 
-      - name: Sign image with cosign (keyless)
+      - name: Sign Image with Cosign
         env:
-          COSIGN_EXPERIMENTAL: "1"
+          COSIGN_EXPERIMENTAL: false
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
         run: |
-          cosign sign --yes "${REGISTRY}/${IMAGE_NAME}@${{ steps.push.outputs.digest }}"
+          cosign sign --yes --key env://COSIGN_PRIVATE_KEY "${REGISTRY}/${IMAGE_NAME}:${REL_TAG}.${IMAGE_VERSION}"
