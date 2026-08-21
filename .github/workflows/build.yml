@@ -3,7 +3,7 @@ name: Build and Push
 env:
   REGISTRY: "ghcr.io"
   IMAGE_NAME: "${{ github.repository }}"
-  FEDORA_VERSION: "44"
+  RELEASE_VER: "44"
   REL_TAG: "wmx"
 
 on:
@@ -44,7 +44,7 @@ jobs:
 
       - name: Set image version
         run: |
-          IMAGE_VERSION="${FEDORA_VERSION}.$(date -u +%Y%m%d).0"
+          IMAGE_VERSION="${RELEASE_VER}.$(date -u +%Y%m%d).0"
           echo "IMAGE_VERSION=${IMAGE_VERSION}" >> "$GITHUB_ENV"
 
       - name: Log in to GHCR
@@ -64,7 +64,7 @@ jobs:
           containerfiles: |
             ./Containerfile
           build-args: |
-            FEDORA_VERSION=${{ env.FEDORA_VERSION }}
+            RELEASE_VER=${{ env.RELEASE_VER }}
           labels: |
             containers.bootc=1
             ostree.bootable=1

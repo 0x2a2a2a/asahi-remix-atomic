@@ -1,6 +1,6 @@
-ARG FEDORA_VERSION
-FROM quay.io/fedora/fedora-bootc:${FEDORA_VERSION} AS builder
-RUN dnf -y install 'dnf5-plugins' && \
+ARG RELEASE_VER
+FROM quay.io/fedora/fedora-bootc:${RELEASE_VER} AS builder
+RUN dnf -y install dnf5-plugins && \
     dnf -y copr enable @asahi/fedora-remix-branding && \
     dnf -y install asahi-repos
 
@@ -8,12 +8,17 @@ RUN /usr/libexec/bootc-base-imagectl build-rootfs \
   --manifest=minimal \
   --exclude kernel \
   --install kernel-16k \
+  --install linux-firmware \
+  --install asahi-repos \
   --install asahi-platform-metapackage-core \
+  --install binutils \
+  --install btrfs-progs \
+  --install cryptsetup \
   --install iwd \
   --install bluez \
   --install micro \
-  --install bash-completion \
-  --install linux-firmware \
+  --install openssh-clients \
+  --install openssh-server \
   /target-rootfs
 
 FROM scratch
@@ -29,33 +34,188 @@ dnf copr enable -y lionheartp/Hyprland
 dnf copr enable -y lihaohong/yazi
 dnf copr enable -y alternateved/keyd
 
-dnf -y install --setopt=install_weak_deps=False \
-  asahi-repos binutils busybox trfs-progs cryptsetup exfatprogs hostname iproute iptables-nft iputils \
-  lsof less mesa-dri-drivers mesa-vulkan-drivers openssh-clients openssh-server \
-  plymouth plymouth-system-theme python-unversioned-command psmisc rpm-ostree rsync sudo tar time tree \
-  usbutils vim-minimal wget2-wget which whois zram-generator-defaults \
-  git-core slirp4netns fuse-overlayfs systemd-container ncurses hfsplus-tools \
-  fd-find fzf eza bat zsh ripgrep yazi resvg zoxide btop fastfetch ncdu hyperfine openssl \
-  strace ltrace lsof socat just age distrobox ly keyd brightnessctl pavucontrol libsecret \
-  logrotate polkit tuned tuned-ppd upower jq kernel-tools
+# base tool & sys mgr
+dnf -y install \
+  attr \
+  bash-completion \
+  hostname \
+  iproute \
+  jq \
+  less \
+  vim-minimal \
+  tar \
+  time \
+  tree \
+  which \
+  whois \
+  psmisc \
+  procps-ng \
+  lsof \
+  ncurses \
+  openssl \
+  rsync \
+  sudo \
+  polkit \
+  logrotate \
+  rpm-ostree \
+  nss-altfiles \
+  iputils \
+  socat \
+  exfatprogs \
+  hfsplus-tools \
+  fuse-overlayfs \
+  usbutils
 
-dnf -y install asahi-platform-metapackage-audio asahi-platform-metapackage-desktop asahi-platform-metapackage-mesa
+# asahi support
+dnf -y install \
+  asahi-platform-metapackage-audio \
+  asahi-platform-metapackage-desktop \
+  asahi-platform-metapackage-mesa
 
-dnf -y install glibc-all-langpacks default-fonts-cjk-mono default-fonts-cjk-sans default-fonts-cjk-serif \
-  default-fonts-core-emoji default-fonts-core-math default-fonts-core-mono default-fonts-core-sans default-fonts-core-serif \
-  default-fonts-other-mono default-fonts-other-sans default-fonts-other-serif adwaita-sans-fonts adwaita-mono-fonts open-sans-fonts \
-  aajohan-comfortaa-fonts cascadia-mono-nf-fonts fontawesome-6-free-fonts fontawesome-6-brands-fonts terminus-fonts-console
+# virt & pm
+dnf -y install \
+  slirp4netns \
+  systemd-container \
+  distrobox \
+  nix \
+  nix-daemon
 
-dnf -y install --setopt=install_weak_deps=False \
-  hyprland hyprland-uwsm hyprland-guiutils hyprpicker hyprpaper hypridle hyprlock hyprpolkitagent hyprshot hyprcursor \
-  xdg-desktop-portal-hyprland xdg-desktop-portal-gtk xdg-desktop-portal xdg-utils xdg-user-dirs dbus-tools dconf qt6ct nwg-look \
-  mailcap wl-clipboard
+# i18n & fonts
+dnf -y install \
+  glibc-all-langpacks \
+  default-fonts-cjk-mono \
+  default-fonts-cjk-sans \
+  default-fonts-cjk-serif \
+  default-fonts-core-emoji \
+  default-fonts-core-math \
+  default-fonts-core-mono \
+  default-fonts-core-sans \
+  default-fonts-core-serif \
+  default-fonts-other-mono \
+  default-fonts-other-sans \
+  default-fonts-other-serif \
+  adwaita-sans-fonts \
+  adwaita-mono-fonts \
+  open-sans-fonts \
+  aajohan-comfortaa-fonts \
+  cascadia-mono-nf-fonts \
+  fontawesome-6-free-fonts \
+  fontawesome-6-brands-fonts \
+  terminus-fonts-console
 
-dnf -y install --setopt=install_weak_deps=False \
-  qt6-qtwayland qt5-qtwayland alacritty foot cage mako waybar fuzzel cliphist keepassxc \
-  fcitx5 fcitx5-configtool fcitx5-gtk fcitx5-qt fcitx5-rime luajit \
-  thunar thunar-volman thunar-media-tags-plugin thunar-archive-plugin xarchiver 7zip unzip unzip \
-  chromium firefox firefox-langpacks nix nix-daemon tuned-gtk
+# cli
+dnf -y install \
+  git-core \
+  wget2-wget \
+  fd-find \
+  fzf \
+  ripgrep \
+  eza \
+  bat \
+  yazi \
+  resvg \
+  zoxide \
+  hyperfine \
+  just \
+  age \
+  strace \
+  ltrace
+
+# shell & terminal
+dnf -y install \
+  zsh \
+  alacritty \
+  foot \
+  fastfetch \
+  btop \
+  ncdu
+
+# power
+dnf -y install \
+  kernel-tools \
+  tuned \
+  tuned-ppd \
+  tuned-gtk \
+  upower \
+  pavucontrol \
+  brightnessctl \
+  keyd
+
+# hyprland
+dnf -y install \
+  hyprland \
+  hyprland-uwsm \
+  hyprland-guiutils \
+  hyprpicker \
+  hyprpaper \
+  hypridle \
+  hyprlock \
+  hyprpolkitagent \
+  hyprshot \
+  hyprcursor
+
+# freedesktop
+dnf -y install \
+  xdg-desktop-portal \
+  xdg-desktop-portal-hyprland \
+  xdg-desktop-portal-gtk \
+  xdg-utils \
+  xdg-user-dirs \
+  dbus-tools \
+  mailcap
+
+# wayland
+dnf -y install \
+  waybar \
+  fuzzel \
+  mako \
+  cliphist \
+  wl-clipboard \
+  cage
+
+# qt & gtk theme
+dnf -y install \
+  qt6ct \
+  qt6-qtwayland \
+  qt5-qtwayland \
+  nwg-look \
+  dconf
+
+# ime
+dnf -y install \
+  fcitx5 \
+  fcitx5-configtool \
+  fcitx5-gtk \
+  fcitx5-qt \
+  fcitx5-rime \
+  luajit
+
+# fm
+dnf -y install \
+  thunar \
+  thunar-volman \
+  thunar-media-tags-plugin \
+  thunar-archive-plugin \
+  xarchiver \
+  7zip \
+  unzip
+
+# browser
+dnf -y install \
+  chromium \
+  firefox \
+  firefox-langpacks
+
+# passwd
+dnf -y install \
+  keepassxc \
+  libsecret
+
+# misc
+dnf -y install \
+  plymouth \
+  plymouth-system-theme
+
 
 semanage fcontext -a -t xdm_exec_t "/usr/bin/ly"
 
@@ -63,14 +223,15 @@ printf "NoDisplay=true\n" >> /usr/share/applications/panel-preferences.desktop
 mkdir /etc/iwd
 printf "[General]\nEnableNetworkConfiguration=true\n\n[Network]\nNameResolvingService=systemd\n" > /etc/iwd/main.conf
 
+printf "pci:v000017A0d00009755*\n ID_AUTOSUSPEND=0\n" > /usr/lib/udev/hwdb.d/65-autosuspend-override-asahi.hwdb
+
 systemctl enable iwd.service keyd.service tuned.service tuned-ppd.service nix-daemon.socket ly@tty7.service
 
 # Remove leftover build artifacts from installing packages in the final built image.
 dnf clean all
 
-# rm -f /boot/symvers*
-# rm -rf /run/* /run/.* /tmp/* /tmp/.* 2>/dev/null || true
-# rm -rf /var/cache/* /var/log/* /var/lib/dnf/* /var/db/sudo /var/spool/plymouth
+rm -rf /run/* /run/.* /tmp/* /tmp/.* 2>/dev/null || true
+rm -rf /var/cache/* /var/log/* /var/lib/dnf/* /var/db/sudo /var/spool/plymouth
 
 # Run the bootc linter to avoid encountering certain bugs and maintain content quality. Place this as the final command in your last run invoaction.
 bootc container lint
