@@ -82,10 +82,16 @@ dnf -y install --setopt=install_weak_deps=False \
 dnf -y install \
   asahi-platform-metapackage-audio \
   asahi-platform-metapackage-desktop \
-  asahi-platform-metapackage-mesa
+  asahi-platform-metapackage-mesa \
+  mesa-vulkan-drivers
 
-# freedesktop
-dnf -y install \
+# desktop utils
+dnf -y install --setopt=install_weak_deps=False \
+  qt6ct \
+  qt6-qtwayland \
+  qt5-qtwayland \
+  nwg-look \
+  dconf \
   xdg-desktop-portal \
   xdg-desktop-portal-hyprland \
   xdg-desktop-portal-gtk \
@@ -135,23 +141,6 @@ dnf -y install --setopt=install_weak_deps=False \
   strace \
   ltrace
 
-# wayland
-dnf -y install \
-  waybar \
-  fuzzel \
-  mako \
-  cliphist \
-  wl-clipboard \
-  cage
-
-# qt & gtk theme
-dnf -y install --setopt=install_weak_deps=False \
-  qt6ct \
-  qt6-qtwayland \
-  qt5-qtwayland \
-  nwg-look \
-  dconf
-
 # power
 dnf -y install --setopt=install_weak_deps=False \
   kernel-tools \
@@ -163,6 +152,19 @@ dnf -y install --setopt=install_weak_deps=False \
   brightnessctl \
   keyd \
   playerctl
+
+# wayland
+dnf -y install \
+  libwayland-client \
+  libwayland-server \
+  libwayland-cursor \
+  libwayland-egl \
+  waybar \
+  fuzzel \
+  mako \
+  cliphist \
+  wl-clipboard \
+  cage
 
 # hyprland
 dnf -y install --setopt=install_weak_deps=False \
@@ -178,7 +180,7 @@ dnf -y install --setopt=install_weak_deps=False \
   hyprcursor
 
 # shell & terminal
-dnf -y install \
+dnf -y install --setopt=install_weak_deps=False \
   zsh \
   alacritty \
   foot \
@@ -187,7 +189,7 @@ dnf -y install \
   ncdu
 
 # ime
-dnf -y install \
+dnf -y install --setopt=install_weak_deps=False\
   fcitx5 \
   fcitx5-configtool \
   fcitx5-gtk \
