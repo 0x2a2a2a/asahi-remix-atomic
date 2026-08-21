@@ -33,6 +33,7 @@ dnf copr enable -y @asahi/fedora-remix-branding
 dnf copr enable -y lionheartp/Hyprland
 dnf copr enable -y lihaohong/yazi
 dnf copr enable -y alternateved/keyd
+dnf copr enable -y deltacopy/darkly
 
 # base tool & sys mgr
 dnf -y install --setopt=install_weak_deps=False \
@@ -222,7 +223,9 @@ dnf -y install \
 # misc
 dnf -y install \
   plymouth \
-  plymouth-system-theme
+  plymouth-system-theme \
+  sassc \
+  darkly
 
 semanage fcontext -a -t xdm_exec_t "/usr/bin/ly"
 
