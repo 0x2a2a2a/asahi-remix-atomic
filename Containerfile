@@ -6,12 +6,14 @@ RUN dnf -y install 'dnf5-plugins' && \
 
 RUN /usr/libexec/bootc-base-imagectl build-rootfs \
   --manifest=minimal \
-  --exclude kernel
-  --install kernel-16k
-  --install asahi-platform-metapackage-core
-  --install iwd
-  --install bluez
-  --install micro
+  --exclude kernel \
+  --install kernel-16k \
+  --install asahi-platform-metapackage-core \
+  --install iwd \
+  --install bluez \
+  --install micro \
+  --install bash-completion \
+  --install linux-firmware \
   /target-rootfs
 
 FROM scratch
@@ -28,7 +30,7 @@ dnf copr enable -y lihaohong/yazi
 dnf copr enable -y alternateved/keyd
 
 dnf -y install --setopt=install_weak_deps=False \
-  asahi-repos binutils busybox bash bash-completion btrfs-progs cryptsetup exfatprogs hostname iproute iptables-nft iputils \
+  asahi-repos binutils busybox trfs-progs cryptsetup exfatprogs hostname iproute iptables-nft iputils \
   lsof less mesa-dri-drivers mesa-vulkan-drivers openssh-clients openssh-server \
   plymouth plymouth-system-theme python-unversioned-command psmisc rpm-ostree rsync sudo tar time tree \
   usbutils vim-minimal wget2-wget which whois zram-generator-defaults \
@@ -66,9 +68,9 @@ systemctl enable iwd.service keyd.service tuned.service tuned-ppd.service nix-da
 # Remove leftover build artifacts from installing packages in the final built image.
 dnf clean all
 
-rm -f /boot/symvers*
-rm -rf /run/* /run/.* /tmp/* /tmp/.* 2>/dev/null || true
-rm -rf /var/cache/* /var/log/* /var/lib/dnf/* /var/db/sudo /var/spool/plymouth
+# rm -f /boot/symvers*
+# rm -rf /run/* /run/.* /tmp/* /tmp/.* 2>/dev/null || true
+# rm -rf /var/cache/* /var/log/* /var/lib/dnf/* /var/db/sudo /var/spool/plymouth
 
 # Run the bootc linter to avoid encountering certain bugs and maintain content quality. Place this as the final command in your last run invoaction.
 bootc container lint
