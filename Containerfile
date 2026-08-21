@@ -142,7 +142,7 @@ dnf -y install \
   keyd
 
 # hyprland
-dnf -y install \
+dnf -y install --setopt=install_weak_deps=False \
   hyprland \
   hyprland-uwsm \
   hyprland-guiutils \
@@ -225,7 +225,13 @@ printf "[General]\nEnableNetworkConfiguration=true\n\n[Network]\nNameResolvingSe
 
 printf "pci:v000017A0d00009755*\n ID_AUTOSUSPEND=0\n" > /usr/lib/udev/hwdb.d/65-autosuspend-override-asahi.hwdb
 
-systemctl enable iwd.service keyd.service tuned.service tuned-ppd.service nix-daemon.socket ly@tty7.service
+systemctl enable \
+  iwd.service \
+  keyd.service \
+  tuned.service \
+  tuned-ppd.service \
+  nix-daemon.socket \
+  ly@tty7.service
 
 # Remove leftover build artifacts from installing packages in the final built image.
 dnf clean all
