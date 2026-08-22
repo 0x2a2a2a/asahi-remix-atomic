@@ -19,7 +19,7 @@ jobs:
           account: ${{ github.repository_owner }}
           token: ${{ secrets.GITHUB_TOKEN }}
           image-names: ${{ github.event.repository.name }}
-          image-tags: "!latest !wmx"
+          image-tags: "!latest !wmx !themes"
           cut-off: 4w
           keep-n-most-recent: 5
           dry-run: false

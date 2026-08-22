@@ -1,0 +1,71 @@
+name: Build Themes
+
+env:
+  REGISTRY: "ghcr.io"
+  IMAGE_NAME: "${{ github.repository }}"
+  RELEASE_VER: "44"
+  THEMES_TAG: "themes"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'themes.Containerfile'
+      - '.github/workflows/themes.yml'
+  workflow_dispatch:
+
+jobs:
+  build-themes:
+    name: Build and Push themes image
+    runs-on: "ubuntu-24.04-arm"
+    timeout-minutes: 30
+
+    permissions:
+      packages: write
+      contents: read
+
+    steps:
+      - name: Free disk space
+        uses: hastd/free-disk-space@v0.1.2
+        with:
+          exclude: |
+            /opt/hostedtoolcache/Python
+          swapoff: false
+          skip-if-available: "64G"
+
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Log in to GHCR
+        uses: redhat-actions/podman-login@v1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Themes Image with Buildah
+        id: build
+        uses: redhat-actions/buildah-build@v3
+        with:
+          oci: true
+          image: ${{ env.IMAGE_NAME }}
+          tags: ${{ env.THEMES_TAG }}
+          containerfiles: |
+            ./themes.Containerfile
+          build-args: |
+            RELEASE_VER=${{ env.RELEASE_VER }}
+          labels: |
+            org.opencontainers.image.description=Qogir/themes, Bibata cursors and qogir-adwaita-qt style
+          annotations: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          buildah-image: quay.io/buildah/stable
+
+      - name: Push Themes Image
+        uses: redhat-actions/push-to-registry@v2
+        with:
+          image: ${{ env.IMAGE_NAME }}
+          tags: ${{ env.THEMES_TAG }}
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
