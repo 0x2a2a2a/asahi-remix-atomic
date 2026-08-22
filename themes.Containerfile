@@ -6,7 +6,7 @@ set -xeuo pipefail
 
 dnf -y --setopt=install_weak_deps=False install \
   cmake curl gcc-c++ git make tar \
-  gtk3 qt5-qtbase-devel qt6-qtbase-devel sassc
+  gtk3 qt5-qtbase-devel qt5-qtx11extras-devel qt6-qtbase-devel sassc
 
 dnf clean all
 EORUN
