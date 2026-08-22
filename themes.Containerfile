@@ -5,7 +5,7 @@ RUN <<EORUN
 set -xeuo pipefail
 
 dnf -y --setopt=install_weak_deps=False install \
-  cmake curl gcc-c++ git make tar \
+  cmake curl gcc-c++ git make tar which \
   gtk3 qt5-qtbase-devel qt5-qtx11extras-devel qt6-qtbase-devel sassc
 
 dnf clean all
@@ -18,6 +18,17 @@ RUN <<EORUN
 set -xeuo pipefail
 
 git clone --depth 1 https://github.com/pijulius/qogir-adwaita-qt.git
+
+# Rename the style keys (adwaita -> qogir): QStyleFactory matches plugin keys(), so
+# QT_STYLE_OVERRIDE=qogir / -style qogir become the selectable names. Verified this
+# patch only touches the 4 key/create literals in adwaitastyleplugin.cpp.
+sed -i -e 's/"adwaita-light"/"qogir-light"/' \
+       -e 's/"adwaita-dark"/"qogir-dark"/' \
+       -e 's/"adwaita"/"qogir"/' \
+       -e 's/"Adwaita-Dark"/"Qogir-Dark"/' \
+       -e 's/"Adwaita-Light"/"Qogir-Light"/' \
+       -e 's/"Adwaita"/"Qogir"/' \
+       qogir-adwaita-qt/src/style/adwaitastyleplugin.cpp
 
 cmake -S qogir-adwaita-qt -B build-qt6 \
   -DCMAKE_BUILD_TYPE=Release \
