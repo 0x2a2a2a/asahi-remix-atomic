@@ -1,0 +1,146 @@
+name: Build and Push
+
+env:
+  REGISTRY: "ghcr.io"
+  IMAGE_NAME: "${{ github.repository }}"
+  REL_VER: "44"
+  REL_TAG: "wmx"
+
+on:
+  push:
+    branches:
+      - main
+
+  schedule:
+    - cron: '12 3 * * *'
+
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    name: Build and Push bootc image
+    runs-on: "ubuntu-24.04-arm"
+    timeout-minutes: 30
+
+    permissions:
+      packages: write
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Free disk space
+        uses: hastd/free-disk-space@v0.1.2
+        with:
+          exclude: |
+            /opt/hostedtoolcache/Python
+          swapoff: false
+          skip-if-available: "64G"
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set image version
+        run: |
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+            IMAGE_VERSION="${REL_VER}.$(date -u +%Y%m%d).0"
+          else
+            IMAGE_VERSION="${GITHUB_SHA:0:7}"
+          fi
+          echo "IMAGE_VERSION=${IMAGE_VERSION}" >> "$GITHUB_ENV"
+          echo "IMAGE_VERSION=${IMAGE_VERSION}"
+          echo "IS_SCHEDULE=$([[ "${{ github.event_name }}" == "schedule" ]] && echo true || echo false)" >> "$GITHUB_ENV"
+
+      - name: Log in to GHCR
+        uses: redhat-actions/podman-login@v1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Image with Buildah
+        id: build
+        uses: redhat-actions/buildah-build@v3
+        with:
+          oci: true
+          image: ${{ env.IMAGE_NAME }}
+          tags: prechunk
+          containerfiles: |
+            ./Containerfile
+          build-args: |
+            REL_VER=${{ env.REL_VER }}
+          labels: |
+            containers.bootc=1
+            ostree.bootable=1
+            org.opencontainers.image.version=${{ env.IMAGE_VERSION }}
+            org.opencontainers.image.description=Custom Bootc Image
+          annotations: |
+            containers.bootc=1
+            ostree.bootable=1
+            org.opencontainers.image.version=${{ env.IMAGE_VERSION }}
+            org.opencontainers.image.description=Custom Bootc Image
+          buildah-image: quay.io/buildah/stable
+          extra-args: |
+            --cap-add=all
+            --device=/dev/fuse
+            --security-opt=label=disable
+
+      - name: Chunk Image with Chunkah
+        id: chunk
+        run: |
+          IMAGE_REF="localhost/${IMAGE_NAME}:prechunk"
+          podman inspect "${IMAGE_REF}" > config_ref.json
+
+          mkdir out
+          podman run --rm "--mount=type=image,src=${IMAGE_REF},target=/chunkah" \
+              -v "./config_ref.json:/config_ref.json" \
+              -v "./out:/run/out" \
+              quay.io/coreos/chunkah:latest build \
+              --verbose \
+              --max-layers 128 \
+              --config /config_ref.json \
+              --tag "${IMAGE_NAME}:${REL_TAG}" \
+              --annotation org.opencontainers.image.base.digest- \
+              --annotation org.opencontainers.image.base.name- \
+              --label io.buildah.version- \
+              --output oci:/run/out/chunked
+
+      - name: Push Image with Skopeo
+        id: push
+        run: |
+          if [[ "${IS_SCHEDULE}" == "true" ]]; then
+            ROLLING_TAG="${REL_TAG}"
+          else
+            ROLLING_TAG="${REL_TAG}-ci"
+          fi
+          echo "ROLLING_TAG=${ROLLING_TAG}" >> "$GITHUB_ENV"
+          skopeo copy \
+              --authfile "${REGISTRY_AUTH_FILE}" \
+              --retry-times 3 \
+              --dest-compress-format zstd \
+              "oci:./out/chunked" \
+              "docker://${REGISTRY}/${IMAGE_NAME}:${ROLLING_TAG}"
+          skopeo copy \
+              --authfile "${REGISTRY_AUTH_FILE}" \
+              --retry-times 3 \
+              --dest-compress-format zstd \
+              "docker://${REGISTRY}/${IMAGE_NAME}:${ROLLING_TAG}" \
+              "docker://${REGISTRY}/${IMAGE_NAME}:${ROLLING_TAG}.${IMAGE_VERSION}"
+          if [[ "${IS_SCHEDULE}" == "true" ]]; then
+              skopeo copy \
+                  --authfile "${REGISTRY_AUTH_FILE}" \
+                  --retry-times 3 \
+                  --dest-compress-format zstd \
+                  "docker://${REGISTRY}/${IMAGE_NAME}:${ROLLING_TAG}.${IMAGE_VERSION}" \
+                  "docker://${REGISTRY}/${IMAGE_NAME}:latest"
+          fi
+
+      - name: Sign Image with Cosign
+        env:
+          COSIGN_EXPERIMENTAL: false
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+        run: |
+          IMAGE_DIGEST="$(skopeo inspect --authfile "${REGISTRY_AUTH_FILE}" --format '{{.Digest}}' "docker://${REGISTRY}/${IMAGE_NAME}:${ROLLING_TAG}.${IMAGE_VERSION}")"
+          cosign sign --yes --key env://COSIGN_PRIVATE_KEY "${REGISTRY}/${IMAGE_NAME}@${IMAGE_DIGEST}"
