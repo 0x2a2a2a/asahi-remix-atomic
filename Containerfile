@@ -43,7 +43,7 @@ set -xeuo pipefail
 
 dnf -y --setopt=install_weak_deps=False install \
   7zip attr bash-completion bind-utils bluez-tools bsdtar busybox exfatprogs fuse-overlayfs \
-  git-core gtk-murrine-engine hfsplus-tools hostname iproute iputils jq keyd less logrotate lsof \
+  git-core hfsplus-tools hostname iproute iputils jq keyd less logrotate lsof \
   ncurses nss-altfiles openssl polkit procps-ng psmisc python-unversioned-command \
   rpm-ostree rsync socat squashfs-tools strace sudo time tree tuned tuned-ppd tuned-switcher tzdata \
   udftools unzip upower usbutils vim-minimal which whois xxhash
@@ -68,7 +68,7 @@ dnf -y --setopt=install_weak_deps=False install \
   fontawesome-6-free-fonts fontawesome-6-brands-fonts open-sans-fonts terminus-fonts-console
 
 dnf -y --setopt=install_weak_deps=False install \
-  ly cage qt6ct qt6-qtwayland qt5-qtwayland dconf nwg-look kvantum kvantum-qt5 \
+  ly cage qt6ct qt6-qtwayland qt5-qtwayland dconf nwg-look gtk-murrine-engine \
   xdg-desktop-portal xdg-desktop-portal-gtk xdg-desktop-portal-hyprland \
   xdg-utils xdg-user-dirs dbus-tools libsecret sassc pavucontrol brightnessctl playerctl
 
