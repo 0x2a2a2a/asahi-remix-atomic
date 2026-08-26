@@ -44,7 +44,7 @@ RUN <<RUN-B
 set -xeuo pipefail
 
 dnf -y --setopt=install_weak_deps=False install \
-  7zip attr bash-completion bind-utils bluez-tools bsdtar busybox exfatprogs fuse-overlayfs \
+  @core @standard 7zip attr bash-completion bind-utils bluez-tools bsdtar busybox exfatprogs fuse-overlayfs \
   git-core hfsplus-tools hostname iproute iputils jq keyd less logrotate lsof \
   ncurses nss-altfiles openssl polkit procps-ng psmisc python-unversioned-command \
   rpm-ostree rsync socat squashfs-tools strace sudo time tree tuned tuned-ppd tuned-switcher tzdata \
