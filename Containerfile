@@ -6,7 +6,6 @@ set -xeuo pipefail
 dnf -y install dnf5-plugins
 dnf -y copr enable @asahi/fedora-remix-branding
 dnf -y copr enable lionheartp/Hyprland
-dnf -y copr enable avengemedia/dms
 dnf -y copr enable alternateved/keyd
 # dnf -y install --nogpgcheck --repofrompath 'terra,https://repos.fyralabs.com/terra$releasever' terra-release terra-gpg-keys
 dnf -y install asahi-repos
@@ -28,6 +27,8 @@ dnf -y install asahi-repos
   --install plymouth \
   --install plymouth-system-theme \
   --install sudo \
+  --install brcmfmac-firmware \
+  --install cirrus-audio-firmware \
   /target-rootfs
 
 mkdir -p /target-rootfs/etc/yum.repos.d /target-rootfs/etc/pki/rpm-gpg
@@ -47,7 +48,7 @@ dnf -y --setopt=install_weak_deps=False install \
   @core @standard 7zip attr bash-completion bind-utils bluez-tools bsdtar busybox exfatprogs fuse-overlayfs \
   git-core hfsplus-tools hostname iproute iputils jq keyd less logrotate lsof \
   ncurses nss-altfiles openssl polkit procps-ng psmisc python-unversioned-command \
-  rpm-ostree rsync socat squashfs-tools strace sudo time tree tuned tuned-ppd tuned-switcher tzdata \
+  rpm-ostree rsync socat squashfs-tools strace time tree tuned tuned-ppd tuned-switcher tzdata \
   udftools unzip upower usbutils vim-minimal which whois xxhash
 
 dnf -y --setopt=install_weak_deps=False install \
@@ -77,7 +78,7 @@ dnf -y --setopt=install_weak_deps=False install \
 dnf -y --setopt=install_weak_deps=False install \
   hyprland hyprland-uwsm hyprland-guiutils hyprpicker hyprpaper \
   hypridle hyprlock hyprpolkitagent hyprshot hyprcursor \
-  fuzzel dms cliphist wl-clipboard alacritty foot keepassxc matugen imv mpv
+  fuzzel quickshell cliphist wl-clipboard alacritty foot keepassxc matugen imv mpv
 
 dnf -y --setopt=install_weak_deps=False install \
   fcitx5 fcitx5-configtool fcitx5-gtk fcitx5-qt fcitx5-rime luajit
