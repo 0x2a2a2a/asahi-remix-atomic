@@ -1,5 +1,6 @@
 ARG REL_VER
 FROM quay.io/fedora/fedora-bootc:${REL_VER} AS builder
+
 RUN <<RUN-A
 set -xeuo pipefail
 dnf -y install dnf5-plugins
@@ -37,6 +38,7 @@ RUN-A
 
 FROM scratch
 COPY --from=builder /target-rootfs/ /
+COPY sysfiles /var/sysfiles
 
 RUN <<RUN-B
 set -xeuo pipefail
@@ -87,7 +89,8 @@ dnf -y --setopt=install_weak_deps=False install \
 dnf -y --setopt=install_weak_deps=False install \
   chromium firefox firefox-langpacks
 
-semanage fcontext -a -t xdm_exec_t "/usr/bin/ly"
+semanage fcontext -a -f f -t xdm_exec_t "/usr/bin/ly"
+semodule -i /var/sysfiles/nix.pp
 
 printf "NoDisplay=true\n" >> /usr/share/applications/panel-preferences.desktop
 mkdir /etc/iwd
