@@ -18,6 +18,10 @@ on:
 
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-push-base:
     name: Build and Push base image
