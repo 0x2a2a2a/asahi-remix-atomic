@@ -24,7 +24,7 @@ jobs:
           account: user
           token: ${{ secrets.PKG }}
           image-names: ${{ github.event.repository.name }}
-          image-tags: "!latest !wmx !wmx-ci"
+          image-tags: "!wmx !wmx-ci !base"
           cut-off: 4w
           keep-n-most-recent: 5
           dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run || false }}
