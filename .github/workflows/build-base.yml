@@ -4,7 +4,6 @@ env:
   REGISTRY: "ghcr.io"
   IMAGE_NAME: "${{ github.repository }}"
   REL_VER: "44"
-  REL_TAG: "base"
 
 on:
   push:
@@ -19,14 +18,10 @@ on:
 
   workflow_dispatch:
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   build-and-push-base:
     name: Build and Push base image
-    runs-on: "ubuntu-26.04-arm"
+    runs-on: "ubuntu-24.04-arm"
     timeout-minutes: 30
 
     permissions:
@@ -35,24 +30,11 @@ jobs:
       id-token: write
 
     steps:
-      - name: test
-        run: |
-          sudo cat /proc/sys/kernel/unprivileged_userns_clone
-          sudo systemctl status apparmor
-          sudo sysctl kernel.apparmor_restrict_unprivileged_userns=0
-          sudo systemctl stop apparmor
-
       - name: Install cosign
         uses: sigstore/cosign-installer@v3
 
       - name: Checkout
         uses: actions/checkout@v7
-
-      - name: Set up WORKDIR symlink under /run
-        run: |
-          set -euo pipefail
-          sudo ln -sfn "$(pwd)" /run/workdir
-          echo "WORKDIR=/run/workdir" >> "$GITHUB_ENV"
 
       - name: Log in to GHCR
         uses: redhat-actions/podman-login@v2
@@ -60,80 +42,57 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-          auth_file_path: /tmp/auth.json
 
-      - name: Set image version
+      - name: Set base env
         run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           IMAGE_VERSION="${REL_VER}.$(date -u +%Y%m%d).0"
           echo "IMAGE_VERSION=${IMAGE_VERSION}" >> "$GITHUB_ENV"
           echo "IMAGE_VERSION=${IMAGE_VERSION}"
 
-      - name: Build image with Podman
+      - name: Build base image with Buildah
         id: build-base
-        run: |
-          set -euo pipefail
+        uses: redhat-actions/buildah-build@v3
+        with:
+          oci: true
+          image: ${{ env.IMAGE_NAME }}
+          tags: base
+          containerfiles: |
+            ./Containerfile.base
+          build-args: |
+            REL_VER=${{ env.REL_VER }}
+          labels: |
+            containers.bootc=1
+            ostree.bootable=1
+            org.opencontainers.image.version=${{ env.IMAGE_VERSION }}
+            org.opencontainers.image.description=Asahi Remix Base Image
+            org.opencontainers.image.title=Asahi Remix Atomic
+          annotations: |
+            containers.bootc=1
+            ostree.bootable=1
+            org.opencontainers.image.version=${{ env.IMAGE_VERSION }}
+            org.opencontainers.image.description=Asahi Remix Base Image
+            org.opencontainers.image.title=Asahi Remix Atomic
+          buildah-image: quay.io/buildah/stable
+          extra-args: |
+            --cap-add=all
+            --device=/dev/fuse
+            --security-opt=label=disable
 
-          sudo podman build \
-            --format oci \
-            -f "${WORKDIR}/Containerfile.base" \
-            -t "localhost/${IMAGE_NAME}:prechunk" \
-            --build-arg REL_VER="${REL_VER}" \
-            --cap-add=all \
-            --device=/dev/fuse \
-            --security-opt=label=disable \
-            --label containers.bootc=1 \
-            --label ostree.bootable=1 \
-            --label org.opencontainers.image.version="${IMAGE_VERSION}" \
-            --label org.opencontainers.image.description="Asahi Remix Base Image" \
-            --label org.opencontainers.image.title="Asahi Remix Atomic" \
-            --annotation containers.bootc=1 \
-            --annotation ostree.bootable=1 \
-            --annotation org.opencontainers.image.version="${IMAGE_VERSION}" \
-            --annotation org.opencontainers.image.description="Asahi Remix Base Image" \
-            --annotation org.opencontainers.image.title="Asahi Remix Atomic" \
-            "${WORKDIR}"
-
-      - name: Chunk Image with Chunkah
-        id: chunk
-        run: |
-          set -euo pipefail
-
-          IMAGE_REF="localhost/${IMAGE_NAME}:prechunk"
-
-          sudo podman inspect "${IMAGE_REF}" > "${WORKDIR}/config_ref.json"
-
-          mkdir -p "${WORKDIR}/out"
-
-          sudo podman run --rm \
-              "--mount=type=image,src=${IMAGE_REF},target=/chunkah" \
-              -v "${WORKDIR}/config_ref.json:/config_ref.json" \
-              -v "${WORKDIR}/out:/run/out" \
-              -e SOURCE_DATE_EPOCH=0 \
-              quay.io/coreos/chunkah:latest build \
-              --verbose \
-              --max-layers 128 \
-              --config /config_ref.json \
-              --tag "${IMAGE_NAME}:${REL_TAG}" \
-              --annotation org.opencontainers.image.base.digest- \
-              --annotation org.opencontainers.image.base.name- \
-              --output oci:/run/out/chunked
-
-      - name: Push image with Skopeo
+      - name: Push base image with Skopeo
         id: push-base
         run: |
-          set -euo pipefail
-
-          sudo skopeo copy \
-            --authfile /tmp/auth.json \
+          skopeo copy \
+            --authfile "${REGISTRY_AUTH_FILE}" \
             --retry-times 3 \
             --dest-compress-format zstd \
-            "oci:${WORKDIR}/out/chunked" \
-            "docker://${REGISTRY}/${IMAGE_NAME}:${REL_TAG}"
+            "containers-storage:localhost/${IMAGE_NAME}:base" \
+            "docker://${REGISTRY}/${IMAGE_NAME}:base"
 
       - name: Sign base image with Cosign
         env:
           COSIGN_EXPERIMENTAL: false
           COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
         run: |
-          BASE_IMAGE_DIGEST="$(skopeo inspect --authfile /tmp/auth.json --format '{{.Digest}}' "docker://${REGISTRY}/${IMAGE_NAME}:${REL_TAG}")"
+          BASE_IMAGE_DIGEST="$(skopeo inspect --authfile "${REGISTRY_AUTH_FILE}" --format '{{.Digest}}' "docker://${REGISTRY}/${IMAGE_NAME}:base")"
           cosign sign --yes --key env://COSIGN_PRIVATE_KEY "${REGISTRY}/${IMAGE_NAME}@${BASE_IMAGE_DIGEST}"
