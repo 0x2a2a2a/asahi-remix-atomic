@@ -71,6 +71,9 @@ jobs:
             -f "${WORKDIR}/Containerfile.base" \
             -t "localhost/${IMAGE_NAME}:prechunk" \
             --build-arg REL_VER="${REL_VER}" \
+            --cap-add=all \
+            --device=/dev/fuse \
+            --security-opt=label=disable \
             --label containers.bootc=1 \
             --label ostree.bootable=1 \
             --label org.opencontainers.image.version="${IMAGE_VERSION}" \
