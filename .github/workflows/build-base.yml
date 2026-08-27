@@ -37,7 +37,5 @@ jobs:
 
       image_description: Asahi Remix Base Image
 
-      rel_ver: "44"
-
     secrets:
       COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}

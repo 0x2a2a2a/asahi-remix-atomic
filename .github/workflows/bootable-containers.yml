@@ -105,6 +105,7 @@ jobs:
             ${{ inputs.containerfile }}
 
           build-args: |
+            REL_VER=${{ inputs.rel_ver }}
             BASE_IMAGE=${{ inputs.base_image }}
 
           labels: |
@@ -178,17 +179,6 @@ jobs:
             --dest-compress-format zstd \
             docker://${REGISTRY}/${IMAGE_NAME}:${TAG} \
             docker://${REGISTRY}/${IMAGE_NAME}:${TAG}.${IMAGE_VERSION}
-
-
-          if [[ "${IS_RELEASE}" == "true" ]]; then
-
-            skopeo copy \
-              --authfile "${REGISTRY_AUTH_FILE}" \
-              --retry-times 3 \
-              docker://${REGISTRY}/${IMAGE_NAME}:${TAG}.${IMAGE_VERSION} \
-              docker://${REGISTRY}/${IMAGE_NAME}:latest
-
-          fi
 
 
       - name: Sign image

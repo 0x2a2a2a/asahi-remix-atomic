@@ -43,9 +43,6 @@ jobs:
 
       image_description: Asahi Remix Atomic Image
 
-      rel_ver: "44"
-
-
     secrets:
 
       COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
