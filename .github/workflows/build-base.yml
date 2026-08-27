@@ -74,6 +74,8 @@ jobs:
             --cap-add=all \
             --device=/dev/fuse \
             --security-opt=label=disable \
+            --security-opt=seccomp=unconfined \
+            --security-opt=apparmor=unconfined \
             --label containers.bootc=1 \
             --label ostree.bootable=1 \
             --label org.opencontainers.image.version="${IMAGE_VERSION}" \
