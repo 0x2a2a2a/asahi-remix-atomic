@@ -1,0 +1,45 @@
+name: Build WMX image
+
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'Containerfile.base'
+      - '.github/workflows/build-base.yml'
+      - '**.md'
+      - '.gitignore'
+
+  schedule:
+    - cron: "12 3 * * *"
+
+  workflow_dispatch:
+
+
+
+jobs:
+
+  build:
+
+    uses: ./.github/workflows/build-bootc.yml
+
+
+    with:
+
+      containerfile: Containerfile
+
+      image_tag: wmx
+
+      base_image: ghcr.io/${{ github.repository }}:base
+
+      image_title: Asahi Remix Atomic WMX
+
+      image_description: Asahi Remix Atomic Image
+
+      rel_ver: "44"
+
+
+    secrets:
+
+      COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}

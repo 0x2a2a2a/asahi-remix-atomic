@@ -1,10 +1,5 @@
 name: Build base image
 
-env:
-  REGISTRY: "ghcr.io"
-  IMAGE_NAME: "${{ github.repository }}"
-  REL_VER: "44"
-
 on:
   push:
     branches:
@@ -14,89 +9,28 @@ on:
       - '.github/workflows/build-base.yml'
 
   schedule:
-    - cron: '21 0 * * *'
+    - cron: "21 0 * * *"
 
   workflow_dispatch:
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
-  build-and-push-base:
-    name: Build and Push base image
-    runs-on: "ubuntu-24.04-arm"
-    timeout-minutes: 30
 
-    permissions:
-      packages: write
-      contents: read
-      id-token: write
+  build:
 
-    steps:
-      - name: Install cosign
-        uses: sigstore/cosign-installer@v3
+    uses: ./.github/workflows/bootable-containers.yml
 
-      - name: Checkout
-        uses: actions/checkout@v7
+    with:
 
-      - name: Log in to GHCR
-        uses: redhat-actions/podman-login@v2
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      containerfile: Containerfile.base
 
-      - name: Set base env
-        run: |
-          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-          IMAGE_VERSION="${REL_VER}.$(date -u +%Y%m%d).0"
-          echo "IMAGE_VERSION=${IMAGE_VERSION}" >> "$GITHUB_ENV"
-          echo "IMAGE_VERSION=${IMAGE_VERSION}"
+      image_tag: base
 
-      - name: Build base image with Buildah
-        id: build-base
-        uses: redhat-actions/buildah-build@v3
-        with:
-          oci: true
-          image: ${{ env.IMAGE_NAME }}
-          tags: base
-          containerfiles: |
-            ./Containerfile.base
-          build-args: |
-            REL_VER=${{ env.REL_VER }}
-          labels: |
-            containers.bootc=1
-            ostree.bootable=1
-            org.opencontainers.image.version=${{ env.IMAGE_VERSION }}
-            org.opencontainers.image.description=Asahi Remix Base Image
-            org.opencontainers.image.title=Asahi Remix Atomic
-          annotations: |
-            containers.bootc=1
-            ostree.bootable=1
-            org.opencontainers.image.version=${{ env.IMAGE_VERSION }}
-            org.opencontainers.image.description=Asahi Remix Base Image
-            org.opencontainers.image.title=Asahi Remix Atomic
-          buildah-image: quay.io/buildah/stable
-          extra-args: |
-            --cap-add=all
-            --device=/dev/fuse
-            --security-opt=label=disable
+      image_title: Asahi Remix Atomic Base
 
-      - name: Push base image with Skopeo
-        id: push-base
-        run: |
-          skopeo copy \
-            --authfile "${REGISTRY_AUTH_FILE}" \
-            --retry-times 3 \
-            --dest-compress-format zstd \
-            "containers-storage:localhost/${IMAGE_NAME}:base" \
-            "docker://${REGISTRY}/${IMAGE_NAME}:base"
+      image_description: Asahi Remix Base Image
 
-      - name: Sign base image with Cosign
-        env:
-          COSIGN_EXPERIMENTAL: false
-          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
-        run: |
-          BASE_IMAGE_DIGEST="$(skopeo inspect --authfile "${REGISTRY_AUTH_FILE}" --format '{{.Digest}}' "docker://${REGISTRY}/${IMAGE_NAME}:base")"
-          cosign sign --yes --key env://COSIGN_PRIVATE_KEY "${REGISTRY}/${IMAGE_NAME}@${BASE_IMAGE_DIGEST}"
+      rel_ver: "44"
+
+    secrets:
+      COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}

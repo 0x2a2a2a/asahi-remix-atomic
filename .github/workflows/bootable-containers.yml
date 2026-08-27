@@ -1,0 +1,214 @@
+name: Reusable bootable containers image builder
+
+on:
+  workflow_call:
+    inputs:
+      containerfile:
+        required: true
+        type: string
+
+      image_tag:
+        required: true
+        type: string
+
+      base_image:
+        required: false
+        type: string
+        default: ""
+
+      image_title:
+        required: true
+        type: string
+
+      image_description:
+        required: true
+        type: string
+
+      rel_ver:
+        required: false
+        type: string
+        default: "44"
+
+    secrets:
+      COSIGN_PRIVATE_KEY:
+        required: true
+
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+
+jobs:
+
+  build:
+    name: Build bootc image
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+
+    permissions:
+      contents: read
+      packages: write
+
+
+    steps:
+
+      - name: Free disk space
+        uses: hastd/free-disk-space@v0.1.2
+        with:
+          exclude: |
+            /opt/hostedtoolcache/Python
+          swapoff: false
+          skip-if-available: 64G
+
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+
+      - name: Checkout
+        uses: actions/checkout@v7
+
+
+      - name: Prepare env
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+            IMAGE_VERSION="${{ inputs.rel_ver }}.$(date -u +%Y%m%d).0"
+            IS_RELEASE=true
+          else
+            IMAGE_VERSION="${GITHUB_SHA:0:7}"
+            IS_RELEASE=false
+          fi
+
+          echo "IMAGE_VERSION=${IMAGE_VERSION}" >> $GITHUB_ENV
+          echo "IS_RELEASE=${IS_RELEASE}" >> $GITHUB_ENV
+
+          echo "BUILD_DIR=$(pwd)" >> $GITHUB_ENV
+
+      - name: Login GHCR
+        uses: redhat-actions/podman-login@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+
+      - name: Build image
+        uses: redhat-actions/buildah-build@v3
+        with:
+          buildah-image: quay.io/buildah/stable
+
+          oci: true
+
+          image: ${{ env.IMAGE_NAME }}
+
+          tags: prechunk
+
+          containerfiles: |
+            ${{ inputs.containerfile }}
+
+          build-args: |
+            BASE_IMAGE=${{ inputs.base_image }}
+
+          labels: |
+            containers.bootc=1
+            ostree.bootable=1
+            org.opencontainers.image.version=${{ env.IMAGE_VERSION }}
+            org.opencontainers.image.title=${{ inputs.image_title }}
+            org.opencontainers.image.description=${{ inputs.image_description }}
+
+          annotations: |
+            containers.bootc=1
+            ostree.bootable=1
+            org.opencontainers.image.version=${{ env.IMAGE_VERSION }}
+            org.opencontainers.image.title=${{ inputs.image_title }}
+            org.opencontainers.image.description=${{ inputs.image_description }}
+
+          extra-args: |
+            --cap-add=all
+            --device=/dev/fuse
+            --security-opt=label=disable
+
+
+      - name: Chunk image
+        run: |
+
+          IMAGE_REF="localhost/${IMAGE_NAME}:prechunk"
+
+          podman inspect "${IMAGE_REF}" \
+            > config_ref.json
+
+          mkdir out
+
+          podman run --rm \
+            "--mount=type=image,src=${IMAGE_REF},target=/chunkah" \
+            -v "${BUILD_DIR}/config_ref.json:/config_ref.json" \
+            -v "${BUILD_DIR}/out:/run/out" \
+            -e SOURCE_DATE_EPOCH=0 \
+            quay.io/coreos/chunkah:latest build \
+              --verbose \
+              --max-layers 128 \
+              --config /config_ref.json \
+              --tag "${IMAGE_NAME}:${{ inputs.image_tag }}" \
+              --annotation org.opencontainers.image.base.digest- \
+              --annotation org.opencontainers.image.base.name- \
+              --output oci:/run/out/chunked
+
+
+      - name: Push image
+        run: |
+
+          if [[ "${IS_RELEASE}" == "true" ]]; then
+            TAG="${{ inputs.image_tag }}"
+          else
+            TAG="${{ inputs.image_tag }}-ci"
+          fi
+
+          echo "TAG=${TAG}" >> $GITHUB_ENV
+
+
+          skopeo copy \
+            --authfile "${REGISTRY_AUTH_FILE}" \
+            --retry-times 3 \
+            --dest-compress-format zstd \
+            oci:${BUILD_DIR}/out/chunked \
+            docker://${REGISTRY}/${IMAGE_NAME}:${TAG}
+
+
+          skopeo copy \
+            --authfile "${REGISTRY_AUTH_FILE}" \
+            --retry-times 3 \
+            --dest-compress-format zstd \
+            docker://${REGISTRY}/${IMAGE_NAME}:${TAG} \
+            docker://${REGISTRY}/${IMAGE_NAME}:${TAG}.${IMAGE_VERSION}
+
+
+          if [[ "${IS_RELEASE}" == "true" ]]; then
+
+            skopeo copy \
+              --authfile "${REGISTRY_AUTH_FILE}" \
+              --retry-times 3 \
+              docker://${REGISTRY}/${IMAGE_NAME}:${TAG}.${IMAGE_VERSION} \
+              docker://${REGISTRY}/${IMAGE_NAME}:latest
+
+          fi
+
+
+      - name: Sign image
+        env:
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+
+        run: |
+
+          DIGEST=$(skopeo inspect \
+            --authfile "${REGISTRY_AUTH_FILE}" \
+            --format '{{.Digest}}' \
+            docker://${REGISTRY}/${IMAGE_NAME}:${TAG}.${IMAGE_VERSION})
+
+
+          cosign sign \
+            --yes \
+            --key env://COSIGN_PRIVATE_KEY \
+            ${REGISTRY}/${IMAGE_NAME}@${DIGEST}

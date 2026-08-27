@@ -1,44 +1,6 @@
-ARG REL_VER
-FROM quay.io/fedora/fedora-bootc:${REL_VER} AS builder
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
 
-RUN <<RUN-A
-set -xeuo pipefail
-dnf -y install dnf5-plugins
-dnf -y copr enable @asahi/fedora-remix-branding
-dnf -y copr enable lionheartp/Hyprland
-dnf -y copr enable alternateved/keyd
-# dnf -y install --nogpgcheck --repofrompath 'terra,https://repos.fyralabs.com/terra$releasever' terra-release terra-gpg-keys
-dnf -y install asahi-repos
-
-/usr/libexec/bootc-base-imagectl build-rootfs \
-  --manifest=minimal \
-  --exclude kernel \
-  --install kernel-16k \
-  --install linux-firmware \
-  --install asahi-platform-metapackage-core \
-  --install binutils \
-  --install btrfs-progs \
-  --install cryptsetup \
-  --install iwd \
-  --install bluez \
-  --install micro \
-  --install openssh-clients \
-  --install openssh-server \
-  --install plymouth \
-  --install plymouth-system-theme \
-  --install sudo \
-  --install brcmfmac-firmware \
-  --install cirrus-audio-firmware \
-  /target-rootfs
-
-mkdir -p /target-rootfs/etc/yum.repos.d /target-rootfs/etc/pki/rpm-gpg
-cp -a /etc/yum.repos.d/. /target-rootfs/etc/yum.repos.d/
-cp -a /etc/pki/rpm-gpg/. /target-rootfs/etc/pki/rpm-gpg/
-ls -la /target-rootfs
-RUN-A
-
-FROM scratch
-COPY --from=builder /target-rootfs/ /
 COPY sysfiles /var/sysfiles
 
 RUN <<RUN-B
