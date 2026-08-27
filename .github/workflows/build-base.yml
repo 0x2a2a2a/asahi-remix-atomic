@@ -21,7 +21,7 @@ on:
 jobs:
   build-and-push-base:
     name: Build and Push base image
-    runs-on: "ubuntu-26.04-arm"
+    runs-on: "ubuntu-24.04-arm"
     timeout-minutes: 30
 
     permissions:
@@ -72,6 +72,7 @@ jobs:
             org.opencontainers.image.version=${{ env.IMAGE_VERSION }}
             org.opencontainers.image.description=Asahi Remix Base Image
             org.opencontainers.image.title=Asahi Remix Atomic
+          buildah-image: quay.io/buildah/stable
           extra-args: |
             --cap-add=all
             --device=/dev/fuse
