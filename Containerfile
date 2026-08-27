@@ -47,7 +47,7 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=cache,dst=/var/log \
     --mount=type=cache,dst=/var/lib \
     --mount=type=tmpfs,dst=/tmp \
-    /ctx/05.cleanup.sh
+    /ctx/99.cleanup.sh
 
 RUN bootc container lint
 
