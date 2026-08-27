@@ -1,0 +1,47 @@
+ARG REL_VER
+FROM quay.io/fedora/fedora-bootc:${REL_VER} AS builder
+
+RUN <<BUILDER
+set -xeuo pipefail
+dnf -y install dnf5-plugins
+dnf -y copr enable @asahi/fedora-remix-branding
+dnf -y install asahi-repos
+
+/usr/libexec/bootc-base-imagectl build-rootfs \
+  --manifest=minimal \
+  --exclude kernel \
+  --install asahi-platform-metapackage-core \
+  --install binutils \
+  --install bluez \
+  --install btrfs-progs \
+  --install cryptsetup \
+  --install dnf5-plugins \
+  --install iwd \
+  --install openssh-clients \
+  --install openssh-server \
+  --install plymouth \
+  --install plymouth-system-theme \
+  --install sudo \
+  --install vim-minimal \
+  --install kernel-16k \
+  --install linux-firmware \
+  --install brcmfmac-firmware \
+  --install cirrus-audio-firmware \
+  /target-rootfs
+
+mkdir -p /target-rootfs/etc/yum.repos.d /target-rootfs/etc/pki/rpm-gpg
+cp -a /etc/yum.repos.d/. /target-rootfs/etc/yum.repos.d/
+cp -a /etc/pki/rpm-gpg/. /target-rootfs/etc/pki/rpm-gpg/
+ls -la /target-rootfs
+BUILDER
+
+FROM scratch
+COPY --from=builder /target-rootfs/ /
+
+LABEL containers.bootc 1
+LABEL ostree.bootable 1
+
+ENV container=oci
+STOPSIGNAL SIGRTMIN+3
+
+CMD ["/sbin/init"]
