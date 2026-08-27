@@ -1,0 +1,7 @@
+cosign.key
+**/cosign.key
+out
+output
+cache
+*.img
+*.bak
