@@ -22,7 +22,7 @@ jobs:
 
   build:
 
-    uses: ./.github/workflows/build-bootc.yml
+    uses: ./.github/workflows/bootable-containers.yml
 
 
     with:
