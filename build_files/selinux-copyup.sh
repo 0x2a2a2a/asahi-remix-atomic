@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -xeuo pipefail
 
+# rootless mode
 # https://github.com/tuna-os/tunaOS/issues/1562
 # Force copy-up of /etc/selinux/targeted into the top layer so libsemanage's
 # atomic directory renames (tmp -> active) succeed on overlayfs.

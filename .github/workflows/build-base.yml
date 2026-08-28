@@ -23,7 +23,7 @@ permissions:
 
 jobs:
 
-  build:
+  base:
 
     uses: ./.github/workflows/bootable-containers.yml
 

@@ -58,7 +58,7 @@ jobs:
         uses: sigstore/cosign-installer@v3
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Prepare env
         run: |
@@ -81,13 +81,13 @@ jobs:
           echo "${{ secrets.GITHUB_TOKEN }}" | podman login ${{ env.REGISTRY }} \
             --username ${{ github.actor }} \
             --password-stdin \
-            --authfile /tmp/auth.json
+            --authfile /tmp/config.json
 
-      - name: Build image (Rootful)
+      - name: Build image
         run: |
           sudo podman build \
             --format oci \
-            --authfile /tmp/auth.json \
+            --authfile /tmp/config.json \
             --tag ${IMAGE_NAME}:prechunk \
             --file ${{ inputs.containerfile }} \
             --build-arg REL_VER="${{ inputs.rel_ver }}" \
@@ -105,6 +105,7 @@ jobs:
             --cap-add=all \
             --device=/dev/fuse \
             --security-opt=label=disable \
+            --isolation=chroot \
             ${BUILD_DIR}
 
       - name: Chunk image
@@ -140,14 +141,14 @@ jobs:
           echo "TAG=${TAG}" >> $GITHUB_ENV
 
           sudo skopeo copy \
-            --authfile /tmp/auth.json \
+            --authfile /tmp/config.json \
             --retry-times 3 \
             --dest-compress-format zstd \
             oci:${BUILD_DIR}/out/chunked \
             docker://${REGISTRY}/${IMAGE_NAME}:${TAG}
 
           sudo skopeo copy \
-            --authfile /tmp/auth.json \
+            --authfile /tmp/config.json \
             --retry-times 3 \
             --dest-compress-format zstd \
             docker://${REGISTRY}/${IMAGE_NAME}:${TAG} \
@@ -158,10 +159,11 @@ jobs:
           COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
         run: |
           DIGEST=$(skopeo inspect \
-            --authfile /tmp/auth.json \
+            --authfile /tmp/config.json \
             --format '{{.Digest}}' \
             docker://${REGISTRY}/${IMAGE_NAME}:${TAG}.${IMAGE_VERSION})
 
+          export DOCKER_CONFIG=/tmp
           cosign sign \
             --yes \
             --key env://COSIGN_PRIVATE_KEY \

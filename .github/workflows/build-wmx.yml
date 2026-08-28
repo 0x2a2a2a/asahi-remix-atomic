@@ -26,7 +26,7 @@ permissions:
 
 jobs:
 
-  build:
+  wmx:
 
     uses: ./.github/workflows/bootable-containers.yml
 
