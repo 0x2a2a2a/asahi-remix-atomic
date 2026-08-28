@@ -1,47 +1,46 @@
 ARG REL_VER
-FROM quay.io/fedora/fedora-bootc:${REL_VER} AS builder
+REPOS_IMAGE=quay.io/fedora/fedora:${REL_VER}
+BUILDER_IMAGE=quay.io/fedora/fedora:${REL_VER}
 
-RUN <<BUILDER
+FROM $BUILDER_IMAGE as builder
+
+RUN dnf -y install rpm-ostree selinux-policy-targeted python3
+
+COPY . /build
+
+# Avoid umask/permission leakage from the outer environment; ref e.g.
+# - https://github.com/coreos/coreos-assembler/pull/4277
+# - https://gitlab.com/fedora/bootc/base-images/-/merge_requests/254
+# This invocation preserves only the executable bit, and specifically we want to remove:
+# - setuid/setgid
+# - world writability
+# NOTE: This adds world-readability, which is what we intend here as all the content
+# is public; there's no secrets in our container build.
+RUN chmod -R a=rX,u+w /build
+
+WORKDIR /build
+RUN <<EORUN
 set -xeuo pipefail
+
 dnf -y install dnf5-plugins
 dnf -y copr enable @asahi/fedora-remix-branding
 dnf -y install asahi-repos
 
-/usr/libexec/bootc-base-imagectl build-rootfs \
-  --manifest=minimal \
-  --exclude kernel \
-  --install asahi-platform-metapackage-core \
-  --install binutils \
-  --install bluez \
-  --install btrfs-progs \
-  --install cryptsetup \
-  --install dnf5-plugins \
-  --install iwd \
-  --install openssh-clients \
-  --install openssh-server \
-  --install plymouth \
-  --install plymouth-system-theme \
-  --install sudo \
-  --install vim-minimal \
-  --install kernel-16k \
-  --install linux-firmware \
-  --install brcmfmac-firmware \
-  --install cirrus-audio-firmware \
-  /target-rootfs
+rpm-ostree compose rootfs manifests/manifest.yaml /target-rootfs
+bootc container lint --rootfs=/target-rootfs --no-truncate
+EORUN
 
-mkdir -p /target-rootfs/etc/yum.repos.d /target-rootfs/etc/pki/rpm-gpg
-cp -a /etc/yum.repos.d/. /target-rootfs/etc/yum.repos.d/
-cp -a /etc/pki/rpm-gpg/. /target-rootfs/etc/pki/rpm-gpg/
-ls -la /target-rootfs
-BUILDER
-
+# This pulls in the rootfs generated in the previous step
 FROM scratch
 COPY --from=builder /target-rootfs/ /
 
 LABEL containers.bootc 1
-LABEL ostree.bootable 1
-
+# This is an ad-hoc way for us to reference bootc-image-builder in
+# a way that in theory client tooling can inspect and find. Today
+# it isn't widely used.
+LABEL bootc.diskimage-builder quay.io/centos-bootc/bootc-image-builder
+# https://pagure.io/fedora-kiwi-descriptions/pull-request/52
 ENV container=oci
+# Make systemd the default
 STOPSIGNAL SIGRTMIN+3
-
 CMD ["/sbin/init"]

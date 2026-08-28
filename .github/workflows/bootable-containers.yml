@@ -110,7 +110,6 @@ jobs:
             --cap-add=all \
             --device=/dev/fuse \
             --security-opt=label=disable \
-            --privileged \
             ${BUILD_DIR}
 
       - name: Chunk image
