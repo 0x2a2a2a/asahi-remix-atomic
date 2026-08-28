@@ -25,7 +25,7 @@ dnf -y install dnf5-plugins
 dnf -y copr enable @asahi/fedora-remix-branding
 dnf -y install asahi-repos
 
-rpm-ostree compose rootfs manifests/manifest.yaml /target-rootfs
+rpm-ostree compose rootfs --source-root=/ manifests/manifest.yaml /target-rootfs
 bootc container lint --rootfs=/target-rootfs --no-truncate
 EORUN
 
