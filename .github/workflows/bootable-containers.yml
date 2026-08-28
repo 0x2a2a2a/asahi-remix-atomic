@@ -31,6 +31,11 @@ on:
         type: string
         default: "44"
 
+      release:
+        required: false
+        type: boolean
+        default: false
+
     secrets:
       COSIGN_PRIVATE_KEY:
         required: true
@@ -64,7 +69,7 @@ jobs:
         run: |
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
 
-          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+          if [[ "${{ github.event_name }}" == "schedule" || "${{ inputs.release }}" == "true" ]]; then
             IMAGE_VERSION="${{ inputs.rel_ver }}.$(date -u +%Y%m%d).0"
             IS_RELEASE=true
           else
@@ -166,4 +171,11 @@ jobs:
           cosign sign \
             --yes \
             --key env://COSIGN_PRIVATE_KEY \
+            ${REGISTRY}/${IMAGE_NAME}@${DIGEST}
+
+      - name: Verify image signature
+        run: |
+          export DOCKER_CONFIG=/tmp
+          cosign verify \
+            --key "${BUILD_DIR}/cosign.pub" \
             ${REGISTRY}/${IMAGE_NAME}@${DIGEST}

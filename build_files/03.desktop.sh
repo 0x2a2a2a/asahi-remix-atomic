@@ -21,7 +21,8 @@ dnf -y --setopt=install_weak_deps=False --nodocs install \
 
 dnf -y --setopt=install_weak_deps=False --nodocs install \
   mangowm fuzzel foot alacritty waybar swaybg mako wl-clipboard cliphist \
-  wlogout xfce-polkit grim slurp swaylock swayidle imv mpv keepassxc matugen wlr-randr
+  wlogout xfce-polkit grim slurp swaylock swayidle imv mpv keepassxc matugen \
+  wlr-randr kanshi uwsm
 
 dnf -y --setopt=install_weak_deps=False --nodocs install \
   fcitx5 fcitx5-configtool fcitx5-gtk fcitx5-qt fcitx5-rime luajit
