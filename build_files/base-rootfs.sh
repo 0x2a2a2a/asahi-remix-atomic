@@ -239,7 +239,7 @@ if (( ! skip_chroot )) && [[ -d "$ROOTFS/usr/lib/modules" ]]; then
         mount -t sysfs sys "$ROOTFS/sys"; mounted+=("$ROOTFS/sys")
         mount --rbind /dev "$ROOTFS/dev"; mounted+=("$ROOTFS/dev")
         run_chroot depmod "$kver"
-        run_chroot dracut --reproducible --no-hostonly --kver "$kver" --force "/usr/lib/modules/$kver/initramfs.img"
+        run_chroot dracut --reproducible -v --no-hostonly --kver "$kver" --force "/usr/lib/modules/$kver/initramfs.img"
         run_chroot systemctl preset-all
         run_chroot systemctl --user --global preset-all
         cleanup_chroot
