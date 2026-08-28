@@ -74,8 +74,7 @@ jobs:
           echo "IS_RELEASE=${IS_RELEASE}" >> $GITHUB_ENV
           echo "BUILD_DIR=$(pwd)" >> $GITHUB_ENV
 
-          cat /usr/share/containers/storage.conf
-          sed -i 's/driver = "overlay"/driver = "vfs"/' /usr/share/containers/storage.conf
+          # sed -i 's/driver = "overlay"/driver = "vfs"/' /usr/share/containers/storage.conf
 
       - name: Login registry
         run: |
@@ -106,6 +105,8 @@ jobs:
             --cap-add=all \
             --device=/dev/fuse \
             --security-opt=label=disable \
+            --security-opt apparmor=unconfined \
+            --isolation=chroot \
             ${BUILD_DIR}
 
       - name: Chunk image
