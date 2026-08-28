@@ -166,6 +166,7 @@ jobs:
             --authfile /tmp/config.json \
             --format '{{.Digest}}' \
             docker://${REGISTRY}/${IMAGE_NAME}:${TAG}.${IMAGE_VERSION})
+          echo "IMG_DIGEST=${DIGEST}" >> $GITHUB_ENV
 
           export DOCKER_CONFIG=/tmp
           cosign sign \
@@ -178,4 +179,4 @@ jobs:
           export DOCKER_CONFIG=/tmp
           cosign verify \
             --key "${BUILD_DIR}/cosign.pub" \
-            ${REGISTRY}/${IMAGE_NAME}@${DIGEST}
+            ${REGISTRY}/${IMAGE_NAME}@${IMG_DIGEST}
