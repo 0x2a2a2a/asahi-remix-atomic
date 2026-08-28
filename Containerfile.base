@@ -1,5 +1,4 @@
 ARG REL_VER
-REPOS_IMAGE=quay.io/fedora/fedora:${REL_VER}
 BUILDER_IMAGE=quay.io/fedora/fedora:${REL_VER}
 
 FROM $BUILDER_IMAGE as builder
