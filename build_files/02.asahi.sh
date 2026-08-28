@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -xeuo pipefail
 
-
-dnf -y install dnf5-plugins
 dnf -y copr enable @asahi/fedora-remix-branding
 dnf -y install asahi-repos
 

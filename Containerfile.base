@@ -24,7 +24,6 @@ dnf -y --installroot=/base-rootfs \
   bluez \
   btrfs-progs \
   cryptsetup \
-  dnf5-plugins \
   iwd \
   openssh-clients \
   openssh-server \
