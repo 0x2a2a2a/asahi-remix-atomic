@@ -47,18 +47,13 @@ env:
 jobs:
   build:
     name: Build image
-    runs-on: ubuntu-24.04-arm
-    timeout-minutes: 30
+    runs-on: ubuntu-26.04-arm
+    timeout-minutes: 60
+    container:
+      image: quay.io/podman/stable:v5
+      options: "--security-opt apparmor=unconfined --security-opt label=disable --privileged --user root --device /dev/kvm --device /dev/fuse -v /:/run/host:rw -v /var/tmp:/var/tmp -v /tmp:/tmp"
 
     steps:
-      - name: Free disk space
-        uses: hastd/free-disk-space@v0.1.2
-        with:
-          exclude: |
-            /opt/hostedtoolcache/Python
-          swapoff: false
-          skip-if-available: 64G
-
       - name: Install cosign
         uses: sigstore/cosign-installer@v3
 
@@ -67,8 +62,6 @@ jobs:
 
       - name: Prepare env
         run: |
-          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-
           if [[ "${{ github.event_name }}" == "schedule" || "${{ inputs.release }}" == "true" ]]; then
             IMAGE_VERSION="${{ inputs.rel_ver }}.$(date -u +%Y%m%d).0"
             IS_RELEASE=true
@@ -81,6 +74,9 @@ jobs:
           echo "IS_RELEASE=${IS_RELEASE}" >> $GITHUB_ENV
           echo "BUILD_DIR=$(pwd)" >> $GITHUB_ENV
 
+          cat /usr/share/containers/storage.conf
+          sed -i 's/driver = "overlay"/driver = "vfs"/' /usr/share/containers/storage.conf
+
       - name: Login registry
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | podman login ${{ env.REGISTRY }} \
@@ -90,7 +86,7 @@ jobs:
 
       - name: Build image
         run: |
-          sudo podman build \
+          podman build \
             --format oci \
             --authfile /tmp/config.json \
             --tag ${IMAGE_NAME}:prechunk \
@@ -116,11 +112,11 @@ jobs:
         run: |
           IMAGE_REF="localhost/${IMAGE_NAME}:prechunk"
 
-          sudo podman inspect "${IMAGE_REF}" > config_ref.json
+          podman inspect "${IMAGE_REF}" > config_ref.json
 
           mkdir -p out
 
-          sudo podman run --rm \
+          podman run --rm \
             "--mount=type=image,src=${IMAGE_REF},target=/chunkah" \
             -v "${BUILD_DIR}/config_ref.json:/config_ref.json" \
             -v "${BUILD_DIR}/out:/run/out" \
@@ -142,16 +138,16 @@ jobs:
             TAG="${{ inputs.image_tag }}-ci"
           fi
 
-          echo "TAG=${TAG}" >> $GITHUB_ENV
+          echo "IMG_TAG=${TAG}" >> $GITHUB_ENV
 
-          sudo skopeo copy \
+          skopeo copy \
             --authfile /tmp/config.json \
             --retry-times 3 \
             --dest-compress-format zstd \
             oci:${BUILD_DIR}/out/chunked \
             docker://${REGISTRY}/${IMAGE_NAME}:${TAG}
 
-          sudo skopeo copy \
+          skopeo copy \
             --authfile /tmp/config.json \
             --retry-times 3 \
             --dest-compress-format zstd \
@@ -165,7 +161,7 @@ jobs:
           DIGEST=$(skopeo inspect \
             --authfile /tmp/config.json \
             --format '{{.Digest}}' \
-            docker://${REGISTRY}/${IMAGE_NAME}:${TAG}.${IMAGE_VERSION})
+            docker://${REGISTRY}/${IMAGE_NAME}:${IMG_TAG}.${IMAGE_VERSION})
           echo "IMG_DIGEST=${DIGEST}" >> $GITHUB_ENV
 
           export DOCKER_CONFIG=/tmp

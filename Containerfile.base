@@ -1,54 +1,39 @@
 ARG REL_VER
-FROM quay.io/fedora/fedora-bootc:${REL_VER} AS builder
 
-ARG REL_VER
-COPY build_files/base-rootfs.sh /usr/local/bin/base-rootfs.sh
+FROM quay.io/fedora/fedora:${REL_VER} as builder
 
-RUN <<BUILDER
-set -xeuo pipefail
-dnf -y install dnf5-plugins
-dnf -y copr enable @asahi/fedora-remix-branding
-dnf -y install asahi-repos
+COPY . /build
 
-mkdir -p /base-rootfs
-dnf -y --installroot=/base-rootfs \
-  --use-host-config \
-  --releasever="${REL_VER}" \
-  --setopt=install_weak_deps=False \
-  --nodocs install \
-  fedora-repos-archive xfsprogs e2fsprogs dosfstools bootc ostree nss-altfiles \
-  systemd-resolved systemd systemd-pam dbus\
-  asahi-platform-metapackage-core \
-  grub2-efi-aa64 efibootmgr shim bootupd container-selinux coreutils selinux-policy-targeted \
-  binutils \
-  bluez \
-  btrfs-progs \
-  cryptsetup \
-  iwd \
-  openssh-clients \
-  openssh-server \
-  plymouth \
-  plymouth-system-theme \
-  sudo \
-  vim-minimal \
-  kernel-16k \
-  linux-firmware \
-  brcmfmac-firmware \
-  cirrus-audio-firmware
+RUN dnf -y install rpm-ostree selinux-policy-targeted python3 dnf5-plugins && \
+  dnf -y copr enable @asahi/fedora-remix-branding && dnf -y install asahi-repos
 
-/usr/local/bin/base-rootfs.sh /base-rootfs
+# Avoid umask/permission leakage from the outer environment; ref e.g.
+# - https://github.com/coreos/coreos-assembler/pull/4277
+# - https://gitlab.com/fedora/bootc/base-images/-/merge_requests/254
+# This invocation preserves only the executable bit, and specifically we want to remove:
+# - setuid/setgid
+# - world writability
+# NOTE: This adds world-readability, which is what we intend here as all the content
+# is public; there's no secrets in our container build.
+RUN chmod -R a=rX,u+w /build
 
-ls -la /base-rootfs
-bootc container lint --rootfs=/base-rootfs --no-truncate
-BUILDER
+WORKDIR /build
 
+RUN rpm-ostree compose rootfs --source-root=/ manifests/manifest.yaml /target-rootfs
+
+RUN bootc container lint --rootfs=/target-rootfs --no-truncate
+
+# This pulls in the rootfs generated in the previous step
 FROM scratch
-COPY --from=builder /base-rootfs/ /
+COPY --from=builder /target-rootfs/ /
 
 LABEL containers.bootc 1
-LABEL ostree.bootable 1
-
+# This is an ad-hoc way for us to reference bootc-image-builder in
+# a way that in theory client tooling can inspect and find. Today
+# it isn't widely used.
+LABEL bootc.diskimage-builder quay.io/centos-bootc/bootc-image-builder
+# https://pagure.io/fedora-kiwi-descriptions/pull-request/52
 ENV container=oci
+# Make systemd the default
 STOPSIGNAL SIGRTMIN+3
-
 CMD ["/sbin/init"]
