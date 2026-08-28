@@ -11,8 +11,8 @@ on:
       - '**.md'
       - '.gitignore'
 
-  schedule:
-    - cron: "32 1 * * *"
+  # schedule:
+  #   - cron: "32 1 * * *"
 
   workflow_dispatch:
     inputs:

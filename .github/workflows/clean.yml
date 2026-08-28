@@ -1,8 +1,8 @@
 name: Cleanup
 
 on:
-  schedule:
-    - cron: '12 3 * * *'
+  # schedule:
+  #   - cron: '12 3 * * *'
   workflow_dispatch:
     inputs:
       dry-run:
@@ -24,7 +24,7 @@ jobs:
           account: user
           token: ${{ secrets.PKG }}
           image-names: ${{ github.event.repository.name }}
-          image-tags: "!wmx !wmx-ci !base"
+          image-tags: "!wmx !base"
           cut-off: 4w
           keep-n-most-recent: 5
           dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run || false }}

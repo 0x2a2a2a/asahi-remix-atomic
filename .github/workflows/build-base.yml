@@ -8,8 +8,8 @@ on:
       - 'Containerfile.base'
       - '.github/workflows/build-base.yml'
 
-  schedule:
-    - cron: "21 0 * * *"
+  # schedule:
+  #   - cron: "21 0 * * *"
 
   workflow_dispatch:
     inputs:
