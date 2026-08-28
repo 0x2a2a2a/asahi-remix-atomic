@@ -82,6 +82,37 @@ jobs:
 
           echo "BUILD_DIR=$(pwd)" >> $GITHUB_ENV
 
+      - name: Upgrade fuse-overlayfs to fix ENOTEMPTY/rename bug (need >=1.15)
+        run: |
+          set -euo pipefail
+    
+          FOF_VERSION="v1.17"
+    
+          ARCH="$(uname -m)"
+          case "$ARCH" in
+            x86_64)
+              ASSET="fuse-overlayfs-x86_64"
+              ;;
+            aarch64)
+              ASSET="fuse-overlayfs-aarch64"
+              ;;
+            *)
+              echo "Unsupported arch: $ARCH" >&2
+              exit 1
+              ;;
+          esac
+
+          echo "Detected arch: $ARCH -> downloading $ASSET ($FOF_VERSION)"
+    
+          curl -fL -o /tmp/fuse-overlayfs \
+            "https://github.com/containers/fuse-overlayfs/releases/download/${FOF_VERSION}/${ASSET}"
+    
+          chmod +x /tmp/fuse-overlayfs
+          sudo install -m 755 /tmp/fuse-overlayfs /usr/bin/fuse-overlayfs
+    
+          echo "Installed version:"
+          fuse-overlayfs --version
+
       - name: Login GHCR
         uses: redhat-actions/podman-login@v2
         with:
