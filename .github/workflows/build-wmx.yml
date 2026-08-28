@@ -44,6 +44,6 @@ jobs:
 
       base_image: ghcr.io/${{ github.repository }}:base
 
-      release: ${{ inputs.release }}
+      release: ${{ (github.event_name == 'workflow_dispatch' && inputs.release) || false }}
 
     secrets: inherit
