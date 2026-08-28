@@ -1,5 +1,7 @@
 ARG REL_VER
 FROM quay.io/fedora/fedora-bootc:${REL_VER} AS builder
+
+ARG REL_VER
 COPY build_files/base-rootfs.sh /usr/local/bin/base-rootfs.sh
 
 RUN <<BUILDER
