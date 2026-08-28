@@ -47,7 +47,7 @@ env:
 jobs:
   build:
     name: Build image
-    runs-on: ubuntu-26.04-arm
+    runs-on: ubuntu-24.04-arm
     container:
       image: quay.io/podman/stable:v5
       options: "--user root --privileged -v /var/tmp:/var/tmp -v /tmp:/tmp"
