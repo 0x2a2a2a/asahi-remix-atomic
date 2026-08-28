@@ -48,4 +48,4 @@ packages:
   # And we want container-selinux because trying to layer it on later currently causes issues.
   - container-selinux
   # Needed for tpm2 bound luks
-  # - tpm2-tools
+  - tpm2-tools
