@@ -39,10 +39,4 @@ jobs:
 
       base_image: ghcr.io/${{ github.repository }}:base
 
-      image_title: Asahi Remix Atomic WMX
-
-      image_description: Asahi Remix Atomic Image
-
-    secrets:
-
-      COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+    secrets: inherit

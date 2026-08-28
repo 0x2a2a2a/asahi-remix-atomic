@@ -16,13 +16,15 @@ on:
         type: string
         default: ""
 
-      image_title:
-        required: true
+      Image_title:
+        required: false
         type: string
+        default: "Asahi Remix Atomic Image"
 
       image_description:
-        required: true
+        required: false
         type: string
+        default: "Asahi Remix Atomic Image"
 
       rel_ver:
         required: false
@@ -33,21 +35,17 @@ on:
       COSIGN_PRIVATE_KEY:
         required: true
 
-
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
-
 jobs:
-
   build:
-    name: Build bootc image
-    runs-on: ubuntu-24.04-arm
+    name: Build image
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 30
 
     steps:
-
       - name: Free disk space
         uses: hastd/free-disk-space@v0.1.2
         with:
@@ -56,14 +54,11 @@ jobs:
           swapoff: false
           skip-if-available: 64G
 
-
       - name: Install cosign
         uses: sigstore/cosign-installer@v3
 
-
       - name: Checkout
-        uses: actions/checkout@v7
-
+        uses: actions/checkout@v4
 
       - name: Prepare env
         run: |
@@ -79,97 +74,48 @@ jobs:
 
           echo "IMAGE_VERSION=${IMAGE_VERSION}" >> $GITHUB_ENV
           echo "IS_RELEASE=${IS_RELEASE}" >> $GITHUB_ENV
-
           echo "BUILD_DIR=$(pwd)" >> $GITHUB_ENV
 
-      - name: Upgrade fuse-overlayfs to fix ENOTEMPTY/rename bug (need >=1.15)
+      - name: Login registry
         run: |
-          set -euo pipefail
-    
-          FOF_VERSION="v1.17"
-    
-          ARCH="$(uname -m)"
-          case "$ARCH" in
-            x86_64)
-              ASSET="fuse-overlayfs-x86_64"
-              ;;
-            aarch64)
-              ASSET="fuse-overlayfs-aarch64"
-              ;;
-            *)
-              echo "Unsupported arch: $ARCH" >&2
-              exit 1
-              ;;
-          esac
+          echo "${{ secrets.GITHUB_TOKEN }}" | podman login ${{ env.REGISTRY }} \
+            --username ${{ github.actor }} \
+            --password-stdin \
+            --authfile /tmp/auth.json
 
-          echo "Detected arch: $ARCH -> downloading $ASSET ($FOF_VERSION)"
-    
-          curl -fL -o /tmp/fuse-overlayfs \
-            "https://github.com/containers/fuse-overlayfs/releases/download/${FOF_VERSION}/${ASSET}"
-    
-          chmod +x /tmp/fuse-overlayfs
-          sudo install -m 755 /tmp/fuse-overlayfs /usr/bin/fuse-overlayfs
-    
-          echo "Installed version:"
-          fuse-overlayfs --version
-
-      - name: Login GHCR
-        uses: redhat-actions/podman-login@v2
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-
-      - name: Build image
-        uses: redhat-actions/buildah-build@v3
-        with:
-          buildah-image: quay.io/buildah/stable
-
-          oci: true
-
-          image: ${{ env.IMAGE_NAME }}
-
-          tags: prechunk
-
-          containerfiles: |
-            ${{ inputs.containerfile }}
-
-          build-args: |
-            REL_VER=${{ inputs.rel_ver }}
-            BASE_IMAGE=${{ inputs.base_image }}
-
-          labels: |
-            containers.bootc=1
-            ostree.bootable=1
-            org.opencontainers.image.version=${{ env.IMAGE_VERSION }}
-            org.opencontainers.image.title=${{ inputs.image_title }}
-            org.opencontainers.image.description=${{ inputs.image_description }}
-
-          annotations: |
-            containers.bootc=1
-            ostree.bootable=1
-            org.opencontainers.image.version=${{ env.IMAGE_VERSION }}
-            org.opencontainers.image.title=${{ inputs.image_title }}
-            org.opencontainers.image.description=${{ inputs.image_description }}
-
-          extra-args: |
-            --cap-add=all
-            --device=/dev/fuse
-            --security-opt=label=disable
-
+      - name: Build image (Rootful)
+        run: |
+          sudo podman build \
+            --format oci \
+            --authfile /tmp/auth.json \
+            --tag ${IMAGE_NAME}:prechunk \
+            --file ${{ inputs.containerfile }} \
+            --build-arg REL_VER="${{ inputs.rel_ver }}" \
+            --build-arg BASE_IMAGE="${{ inputs.base_image }}" \
+            --label containers.bootc=1 \
+            --label ostree.bootable=1 \
+            --label org.opencontainers.image.version="${IMAGE_VERSION}" \
+            --label org.opencontainers.image.title="${{ inputs.image_title }}" \
+            --label org.opencontainers.image.description="${{ inputs.image_description }}" \
+            --annotation containers.bootc=1 \
+            --annotation ostree.bootable=1 \
+            --annotation org.opencontainers.image.version="${IMAGE_VERSION}" \
+            --annotation org.opencontainers.image.title="${{ inputs.image_title }}" \
+            --annotation org.opencontainers.image.description="${{ inputs.image_description }}" \
+            --cap-add=all \
+            --device=/dev/fuse \
+            --security-opt=label=disable \
+            ${BUILD_DIR}
 
       - name: Chunk image
         run: |
-
           IMAGE_REF="localhost/${IMAGE_NAME}:prechunk"
 
-          podman inspect "${IMAGE_REF}" \
-            > config_ref.json
+          sudo podman inspect "${IMAGE_REF}" > config_ref.json
 
-          mkdir out
+          mkdir -p out
 
-          podman run --rm \
+          sudo podman run --rm \
             "--mount=type=image,src=${IMAGE_REF},target=/chunkah" \
             -v "${BUILD_DIR}/config_ref.json:/config_ref.json" \
             -v "${BUILD_DIR}/out:/run/out" \
@@ -183,10 +129,8 @@ jobs:
               --annotation org.opencontainers.image.base.name- \
               --output oci:/run/out/chunked
 
-
       - name: Push image
         run: |
-
           if [[ "${IS_RELEASE}" == "true" ]]; then
             TAG="${{ inputs.image_tag }}"
           else
@@ -195,34 +139,28 @@ jobs:
 
           echo "TAG=${TAG}" >> $GITHUB_ENV
 
-
-          skopeo copy \
-            --authfile "${REGISTRY_AUTH_FILE}" \
+          sudo skopeo copy \
+            --authfile /tmp/auth.json \
             --retry-times 3 \
             --dest-compress-format zstd \
             oci:${BUILD_DIR}/out/chunked \
             docker://${REGISTRY}/${IMAGE_NAME}:${TAG}
 
-
-          skopeo copy \
-            --authfile "${REGISTRY_AUTH_FILE}" \
+          sudo skopeo copy \
+            --authfile /tmp/auth.json \
             --retry-times 3 \
             --dest-compress-format zstd \
             docker://${REGISTRY}/${IMAGE_NAME}:${TAG} \
             docker://${REGISTRY}/${IMAGE_NAME}:${TAG}.${IMAGE_VERSION}
 
-
       - name: Sign image
         env:
           COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
-
         run: |
-
           DIGEST=$(skopeo inspect \
-            --authfile "${REGISTRY_AUTH_FILE}" \
+            --authfile /tmp/auth.json \
             --format '{{.Digest}}' \
             docker://${REGISTRY}/${IMAGE_NAME}:${TAG}.${IMAGE_VERSION})
-
 
           cosign sign \
             --yes \

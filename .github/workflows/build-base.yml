@@ -33,9 +33,4 @@ jobs:
 
       image_tag: base
 
-      image_title: Asahi Remix Atomic Base
-
-      image_description: Asahi Remix Base Image
-
-    secrets:
-      COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+    secrets: inherit
