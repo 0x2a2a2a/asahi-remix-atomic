@@ -5,3 +5,4 @@ Exec=uwsm start -e -D Mango mango.desktop
 TryExec=uwsm
 DesktopNames=mango;wlroots
 Type=Application
+Icon=mango
