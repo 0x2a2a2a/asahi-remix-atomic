@@ -51,7 +51,7 @@ jobs:
     timeout-minutes: 60
     # container:
     #   image: quay.io/podman/stable:v5
-    #   options: "--security-opt apparmor=unconfined --security-opt label=disable --privileged --user root --device /dev/kvm --device /dev/fuse -v /:/run/host:rw -v /var/tmp:/var/tmp -v /tmp:/tmp"
+    #   options: "--security-opt apparmor=unconfined --security-opt label=disable --privileged --user root --device /dev/fuse -v /:/run/host:rw -v /var/tmp:/var/tmp -v /tmp:/tmp"
 
     steps:
       - name: Install cosign
@@ -95,7 +95,7 @@ jobs:
 
           echo ""
           echo "===== Devices ====="
-          ls -la /dev/kvm /dev/fuse 2>&1
+          ls -la /dev/kvm /dev/fuse 2>&1 || true
 
           echo ""
           echo "===== bwrap availability & minimal test ====="
