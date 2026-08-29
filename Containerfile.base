@@ -5,7 +5,8 @@ FROM quay.io/fedora/fedora:${REL_VER} as builder
 COPY . /build
 
 RUN dnf -y install rpm-ostree selinux-policy-targeted python3 dnf5-plugins && \
-  dnf -y copr enable @asahi/fedora-remix-branding && dnf -y install asahi-repos
+  dnf -y copr enable @asahi/fedora-remix-branding && dnf -y install asahi-repos && \
+  mv /usr/bin/bwrap /usr/bin/bwrap.bak || true
 
 # Avoid umask/permission leakage from the outer environment; ref e.g.
 # - https://github.com/coreos/coreos-assembler/pull/4277
