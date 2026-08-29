@@ -1,0 +1,147 @@
+name: Runner restriction diagnostics
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  diagnose:
+    name: Diagnose (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04-arm, ubuntu-26.04-arm]
+
+    steps:
+      - name: Inspect runner restrictions
+        run: |
+          echo "===== Kernel & OS ====="
+          uname -a
+          cat /etc/os-release 2>/dev/null || true
+
+          echo ""
+          echo "===== AppArmor status ====="
+          cat /sys/module/apparmor/parameters/enabled 2>/dev/null || echo "no apparmor module info"
+          which aa-status >/dev/null 2>&1 && sudo aa-status || echo "aa-status not available or no perms"
+
+          echo ""
+          echo "===== Relevant sysctl values ====="
+          for key in \
+            kernel.apparmor_restrict_unprivileged_userns \
+            kernel.unprivileged_userns_clone \
+            user.max_user_namespaces \
+            kernel.yama.ptrace_scope
+          do
+            val=$(cat /proc/sys/${key//.//} 2>/dev/null || echo "N/A")
+            echo "$key = $val"
+          done
+
+          echo ""
+          echo "===== Current process capabilities ====="
+          cat /proc/self/status | grep -i cap
+          which capsh >/dev/null 2>&1 && capsh --print || echo "capsh not installed"
+
+          echo ""
+          echo "===== cgroup version ====="
+          stat -fc %T /sys/fs/cgroup/ 2>/dev/null
+          mount | grep cgroup
+
+          echo ""
+          echo "===== Devices ====="
+          ls -la /dev/kvm /dev/fuse 2>&1 || true
+
+          echo ""
+          echo "===== bwrap availability & minimal test (host) ====="
+          which bwrap && bwrap --version
+          bwrap --unshare-user --uid 0 --gid 0 --ro-bind / / true \
+            && echo "bwrap unprivileged userns test: OK" \
+            || echo "bwrap unprivileged userns test: FAILED (exit $?)"
+
+          echo ""
+          echo "===== bwrap capability behavior test (host) ====="
+          bwrap --unshare-user --uid 0 --gid 0 --ro-bind / / \
+            --cap-add CAP_DAC_OVERRIDE \
+            capsh --print 2>&1 | grep -i dac_override \
+            || echo "could not verify DAC_OVERRIDE inside bwrap sandbox"
+
+          echo ""
+          echo "===== Current user/group ====="
+          id
+          whoami
+
+      - name: Install podman prerequisites
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y podman
+
+      - name: Inspect bwrap inside nested build context
+        run: |
+          sudo podman run --rm \
+            --cap-add=all \
+            --device=/dev/fuse \
+            --security-opt=label=disable \
+            --security-opt apparmor=unconfined \
+            quay.io/fedora/fedora:44 \
+            bash -c '
+              echo "----- installing bubblewrap + libcap inside Fedora 44 -----"
+              dnf install -y bubblewrap libcap 2>&1 | tail -20
+
+              echo ""
+              echo "----- nested bwrap version -----"
+              bwrap --version
+
+              echo ""
+              echo "----- nested userns test -----"
+              bwrap --unshare-user --uid 0 --gid 0 --ro-bind / / true \
+                && echo "nested userns: OK" || echo "nested userns: FAILED ($?)"
+
+              echo ""
+              echo "----- nested DAC_OVERRIDE test -----"
+              bwrap --unshare-user --uid 0 --gid 0 --ro-bind / / \
+                --cap-add CAP_DAC_OVERRIDE \
+                capsh --print 2>&1 | grep -i dac_override \
+                || echo "nested DAC_OVERRIDE: NOT AVAILABLE"
+
+              echo ""
+              echo "----- gshadow permissions in this image -----"
+              stat -c "%a %U:%G %n" /etc/gshadow
+
+              echo ""
+              echo "----- nested test: can bwrap open a mode-0000 file with DAC_OVERRIDE -----"
+              bwrap --unshare-user --uid 0 --gid 0 --ro-bind / / \
+                --cap-add CAP_DAC_OVERRIDE \
+                cat /etc/gshadow >/dev/null 2>&1 \
+                && echo "nested gshadow open: OK" \
+                || echo "nested gshadow open: FAILED"
+            '
+
+      - name: Inspect bwrap inside podman-build RUN context (closest to real failure)
+        run: |
+          cat > /tmp/Containerfile.diag <<'EOF'
+          FROM quay.io/fedora/fedora:44
+          RUN dnf install -y bubblewrap libcap 2>&1 | tail -20 && \
+              echo "----- RUN-context userns test -----" && \
+              (bwrap --unshare-user --uid 0 --gid 0 --ro-bind / / true \
+                && echo "RUN-context userns: OK" \
+                || echo "RUN-context userns: FAILED ($?)") && \
+              echo "----- RUN-context DAC_OVERRIDE test -----" && \
+              (bwrap --unshare-user --uid 0 --gid 0 --ro-bind / / \
+                --cap-add CAP_DAC_OVERRIDE \
+                capsh --print 2>&1 | grep -i dac_override \
+                || echo "RUN-context DAC_OVERRIDE: NOT AVAILABLE") && \
+              echo "----- RUN-context gshadow open test -----" && \
+              (bwrap --unshare-user --uid 0 --gid 0 --ro-bind / / \
+                --cap-add CAP_DAC_OVERRIDE \
+                cat /etc/gshadow >/dev/null 2>&1 \
+                && echo "RUN-context gshadow open: OK" \
+                || echo "RUN-context gshadow open: FAILED")
+          EOF
+
+          sudo podman build \
+            --cap-add=all \
+            --device=/dev/fuse \
+            --security-opt=label=disable \
+            --security-opt apparmor=unconfined \
+            --no-cache \
+            --file /tmp/Containerfile.diag \
+            /tmp
