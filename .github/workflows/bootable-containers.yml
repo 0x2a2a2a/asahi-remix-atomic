@@ -60,62 +60,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Inspect runner restrictions
-        run: |
-          echo "===== Kernel & OS ====="
-          uname -a
-          cat /etc/os-release 2>/dev/null || true
-
-          echo ""
-          echo "===== AppArmor status ====="
-          cat /sys/module/apparmor/parameters/enabled 2>/dev/null || echo "no apparmor module info"
-          which aa-status >/dev/null 2>&1 && sudo aa-status || echo "aa-status not available or no perms"
-
-          echo ""
-          echo "===== Relevant sysctl values ====="
-          for key in \
-            kernel.apparmor_restrict_unprivileged_userns \
-            kernel.unprivileged_userns_clone \
-            user.max_user_namespaces \
-            kernel.yama.ptrace_scope
-          do
-            val=$(cat /proc/sys/${key//.//} 2>/dev/null || echo "N/A")
-            echo "$key = $val"
-          done
-
-          echo ""
-          echo "===== Current process capabilities ====="
-          cat /proc/self/status | grep -i cap
-          which capsh >/dev/null 2>&1 && capsh --print || echo "capsh not installed"
-
-          echo ""
-          echo "===== cgroup version ====="
-          stat -fc %T /sys/fs/cgroup/ 2>/dev/null
-          mount | grep cgroup
-
-          echo ""
-          echo "===== Devices ====="
-          ls -la /dev/kvm /dev/fuse 2>&1 || true
-
-          echo ""
-          echo "===== bwrap availability & minimal test ====="
-          which bwrap && bwrap --version
-          bwrap --unshare-user --uid 0 --gid 0 --ro-bind / / true \
-            && echo "bwrap unprivileged userns test: OK" \
-            || echo "bwrap unprivileged userns test: FAILED (exit $?)"
-
-          echo ""
-          echo "===== bwrap capability behavior test ====="
-          bwrap --unshare-user --uid 0 --gid 0 --ro-bind / / \
-            --cap-add CAP_DAC_OVERRIDE \
-            capsh --print 2>&1 | grep -i dac_override \
-            || echo "could not verify DAC_OVERRIDE inside bwrap sandbox"
-
-          echo ""
-          echo "===== Current user/group ====="
-          id
-          whoami
-
       - name: Prepare env
         run: |
           if [[ "${{ github.event_name }}" == "schedule" || "${{ inputs.release }}" == "true" ]]; then
@@ -149,12 +93,10 @@ jobs:
             --build-arg REL_VER="${{ inputs.rel_ver }}" \
             --build-arg BASE_IMAGE="${{ inputs.base_image }}" \
             --label containers.bootc=1 \
-            --label ostree.bootable=1 \
             --label org.opencontainers.image.version="${IMAGE_VERSION}" \
             --label org.opencontainers.image.title="${{ inputs.image_title }}" \
             --label org.opencontainers.image.description="${{ inputs.image_description }}" \
             --annotation containers.bootc=1 \
-            --annotation ostree.bootable=1 \
             --annotation org.opencontainers.image.version="${IMAGE_VERSION}" \
             --annotation org.opencontainers.image.title="${{ inputs.image_title }}" \
             --annotation org.opencontainers.image.description="${{ inputs.image_description }}" \
@@ -175,14 +117,11 @@ jobs:
             "--mount=type=image,src=${IMAGE_REF},target=/chunkah" \
             -v "${BUILD_DIR}/config_ref.json:/config_ref.json" \
             -v "${BUILD_DIR}/out:/run/out" \
-            -e SOURCE_DATE_EPOCH=0 \
             quay.io/coreos/chunkah:latest build \
               --verbose \
               --max-layers 128 \
               --config /config_ref.json \
               --tag "${IMAGE_NAME}:${{ inputs.image_tag }}" \
-              --annotation org.opencontainers.image.base.digest- \
-              --annotation org.opencontainers.image.base.name- \
               --output oci:/run/out/chunked
 
       - name: Push image

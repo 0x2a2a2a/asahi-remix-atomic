@@ -1,40 +1,69 @@
 ARG REL_VER
 
-FROM quay.io/fedora/fedora:${REL_VER} as builder
+FROM scratch AS ctx
 
-COPY . /build
+COPY build_files /
 
-RUN dnf -y install rpm-ostree selinux-policy-targeted python3 dnf5-plugins && \
-  dnf -y copr enable @asahi/fedora-remix-branding && dnf -y install asahi-repos && \
-  mv /usr/bin/bwrap /usr/bin/bwrap.bak || true
+FROM quay.io/fedora/fedora-bootc:${REL_VER} AS builder
 
-# Avoid umask/permission leakage from the outer environment; ref e.g.
-# - https://github.com/coreos/coreos-assembler/pull/4277
-# - https://gitlab.com/fedora/bootc/base-images/-/merge_requests/254
-# This invocation preserves only the executable bit, and specifically we want to remove:
-# - setuid/setgid
-# - world writability
-# NOTE: This adds world-readability, which is what we intend here as all the content
-# is public; there's no secrets in our container build.
-RUN chmod -R a=rX,u+w /build
+ARG REL_VER
 
-WORKDIR /build
+RUN <<BUILDER
+set -xeuo pipefail
+dnf -y install dnf5-plugins
+dnf -y copr enable @asahi/fedora-remix-branding
+dnf -y install asahi-repos
 
-RUN rpm-ostree compose rootfs --source-root=/ manifests/manifest.yaml /target-rootfs
+FS_PREFIX=/base-rootfs
 
-RUN bootc container lint --rootfs=/target-rootfs --no-truncate
+mkdir -p "${FS_PREFIX}"
+dnf -y --installroot="${FS_PREFIX}" \
+  --use-host-config \
+  --releasever="${REL_VER}" \
+  --setopt=install_weak_deps=False \
+  --nodocs install \
+    NetworkManager NetworkManager-wifi \
+    acl asahi-platform-metapackage-core attr audit \
+    bash-color-prompt bash-completion bc bind-utils binutils bluez bluez-tools \
+    bootc bootupd brcmfmac-firmware bsdtar btrfs-progs busybox bzip2 \
+    cirrus-audio-firmware compsize container-selinux coreutils crontabs cryptsetup \
+    dbus distrobox dnf dnf5-plugins dos2unix dosfstools dracut dracut-network dracut-squash \
+    e2fsprogs efibootmgr exfatprogs \
+    fastfetch fedora-repos-archive fuse-overlayfs \
+    git-core grub2-efi-aa64 \
+    hostname htop \
+    iproute iputils iwd \
+    jq just \
+    kernel-16k kmscon-freetype kmscon-gl kmscon-pango \
+    less linux-firmware lsof \
+    ncurses nix nix-daemon nmap-ncat nss-altfiles \
+    opensc openssh-clients openssh-server openssl ostree \
+    parted plymouth plymouth-system-theme psmisc python-unversioned-command \
+    rsync \
+    selinux-policy-targeted shim slirp4netns smartmontools socat sudo symlinks systemd systemd-pam systemd-resolved \
+    time tpm2-tools tree tzdata \
+    unzip upower usbutils \
+    vim-minimal \
+    wget which whois \
+    xfsprogs xxhash \
+    zip zram-generator-defaults
 
-# This pulls in the rootfs generated in the previous step
+mkdir -p "${FS_PREFIX}"/etc/yum.repos.d "${FS_PREFIX}"/etc/pki/rpm-gpg
+cp -a /etc/yum.repos.d/. $FS_PREFIX/etc/yum.repos.d/
+cp -a /etc/pki/rpm-gpg/. $FS_PREFIX/etc/pki/rpm-gpg/
+ls -la "${FS_PREFIX}"
+BUILDER
+
 FROM scratch
-COPY --from=builder /target-rootfs/ /
+COPY --from=builder $FS_PREFIX/ /
+
+RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
+    df -h && /ctx/base-rootfs.sh
 
 LABEL containers.bootc 1
-# This is an ad-hoc way for us to reference bootc-image-builder in
-# a way that in theory client tooling can inspect and find. Today
-# it isn't widely used.
-LABEL bootc.diskimage-builder quay.io/centos-bootc/bootc-image-builder
-# https://pagure.io/fedora-kiwi-descriptions/pull-request/52
+
 ENV container=oci
-# Make systemd the default
+
 STOPSIGNAL SIGRTMIN+3
+
 CMD ["/sbin/init"]

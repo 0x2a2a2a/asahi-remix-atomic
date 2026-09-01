@@ -1,0 +1,10 @@
+# minimal/systemd-presets.yaml
+
+# Disable dnf-makecache.timer on bootc/image mode systems
+# https://github.com/coreos/fedora-coreos-tracker/issues/1896#issuecomment-2848251507
+disable dnf-makecache.timer
+
+# Enable bootloader-update.service on F43+ and CentOS9+
+# https://github.com/coreos/fedora-coreos-tracker/issues/1468#issuecomment-2996654547
+# https://fedoraproject.org/wiki/Changes/AutomaticBootloaderUpdatesBootc
+enable bootloader-update.service
