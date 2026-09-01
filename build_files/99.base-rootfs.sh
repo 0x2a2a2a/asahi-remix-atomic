@@ -1,6 +1,8 @@
 #!/bin/bash
 set -xeuo pipefail
 
+cp -avf "/ctx/base-rootfs"/. /
+
 # sed -i 's|^ExecStart=.*|ExecStart=/usr/bin/bootc update --quiet|' /usr/lib/systemd/system/bootc-fetch-apply-updates.service
 
 bootupctl backend generate-update-metadata

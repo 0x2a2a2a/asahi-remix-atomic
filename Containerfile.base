@@ -56,7 +56,17 @@ FROM scratch
 COPY --from=builder /base-rootfs/ /
 
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
-    df -h && /ctx/base-rootfs.sh
+    --mount=type=tmpfs,dst=/run \
+    --mount=type=tmpfs,dst=/tmp \
+    --mount=type=tmpfs,dst=/var \
+    /ctx/05.initramfs.sh
+
+RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
+    --mount=type=tmpfs,dst=/run \
+    --mount=type=tmpfs,dst=/tmp \
+    /ctx/99.base-rootfs.sh
+
+RUN bootc container lint --no-truncate
 
 LABEL containers.bootc 1
 
