@@ -56,7 +56,7 @@ FROM scratch
 COPY --from=builder /base-rootfs/ /
 
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
-    /ctx/99.base-rootfs.sh &&
+    /ctx/99.base-rootfs.sh && \
     /ctx/05.initramfs.sh
 
 RUN bootc container lint --no-truncate
