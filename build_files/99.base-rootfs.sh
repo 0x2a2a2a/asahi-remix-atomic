@@ -50,8 +50,8 @@ sed -i -e '/^d- \/var\/roothome /d' /usr/lib/tmpfiles.d/provision.conf > /dev/nu
 rm -f /usr/lib/tmpfiles.d/home.conf
 
 # https://gitlab.com/fedora/bootc/base-images/-/issues/28
-ln -sT ../run /var/run
-test -d /var/tmp || mkdir -m 1777 /var/tmp
+# ln -sT ../run /var/run
+# test -d /var/tmp || mkdir -m 1777 /var/tmp
 
 RPM_MUT_DB="/usr/lib/sysimage/rpm-ostree-base-db"
 RPM_DB="/usr/lib/sysimage/rpm"
