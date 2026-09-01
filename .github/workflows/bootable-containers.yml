@@ -63,14 +63,15 @@ jobs:
       - name: Prepare env
         run: |
           if [[ "${{ github.event_name }}" == "schedule" || "${{ inputs.release }}" == "true" ]]; then
-            IMAGE_VERSION="${{ inputs.rel_ver }}.$(date -u +%Y%m%d).0"
+            IMG_VER="${{ inputs.rel_ver }}.$(date -u +%Y%m%d).0"
             IS_RELEASE=true
           else
-            IMAGE_VERSION="${GITHUB_SHA:0:7}"
+            IMG_VER="${GITHUB_SHA:0:7}"
             IS_RELEASE=false
           fi
 
-          echo "IMAGE_VERSION=${IMAGE_VERSION}" >> $GITHUB_ENV
+          echo "IMG_VER=${IMG_VER}" >> $GITHUB_ENV
+          echo "IMG_DT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_ENV
           echo "IS_RELEASE=${IS_RELEASE}" >> $GITHUB_ENV
           echo "BUILD_DIR=$(pwd)" >> $GITHUB_ENV
 
@@ -93,13 +94,15 @@ jobs:
             --build-arg REL_VER="${{ inputs.rel_ver }}" \
             --build-arg BASE_IMAGE="${{ inputs.base_image }}" \
             --label containers.bootc=1 \
-            --label org.opencontainers.image.version="${IMAGE_VERSION}" \
+            --label org.opencontainers.image.version="${IMG_VER}" \
             --label org.opencontainers.image.title="${{ inputs.image_title }}" \
             --label org.opencontainers.image.description="${{ inputs.image_description }}" \
+            --label org.opencontainers.image.created="${IMG_DT}" \
             --annotation containers.bootc=1 \
-            --annotation org.opencontainers.image.version="${IMAGE_VERSION}" \
+            --annotation org.opencontainers.image.version="${IMG_VER}" \
             --annotation org.opencontainers.image.title="${{ inputs.image_title }}" \
             --annotation org.opencontainers.image.description="${{ inputs.image_description }}" \
+            --annotation org.opencontainers.image.created="${IMG_DT}" \
             --cap-add=all \
             --device=/dev/fuse \
             --security-opt=label=disable \
@@ -146,7 +149,7 @@ jobs:
             --retry-times 3 \
             --dest-compress-format zstd \
             docker://${REGISTRY}/${IMAGE_NAME}:${TAG} \
-            docker://${REGISTRY}/${IMAGE_NAME}:${TAG}.${IMAGE_VERSION}
+            docker://${REGISTRY}/${IMAGE_NAME}:${TAG}.${IMG_VER}
 
       - name: Sign image
         env:
@@ -155,7 +158,7 @@ jobs:
           DIGEST=$(skopeo inspect \
             --authfile /tmp/config.json \
             --format '{{.Digest}}' \
-            docker://${REGISTRY}/${IMAGE_NAME}:${IMG_TAG}.${IMAGE_VERSION})
+            docker://${REGISTRY}/${IMAGE_NAME}:${IMG_TAG}.${IMG_VER})
           echo "IMG_DIGEST=${DIGEST}" >> $GITHUB_ENV
 
           export DOCKER_CONFIG=/tmp

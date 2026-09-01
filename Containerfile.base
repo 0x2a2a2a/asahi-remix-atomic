@@ -14,10 +14,8 @@ dnf -y install dnf5-plugins
 dnf -y copr enable @asahi/fedora-remix-branding
 dnf -y install asahi-repos
 
-FS_PREFIX=/base-rootfs
-
-mkdir -p "${FS_PREFIX}"
-dnf -y --installroot="${FS_PREFIX}" \
+mkdir -p /base-rootfs
+dnf -y --installroot=/base-rootfs \
   --use-host-config \
   --releasever="${REL_VER}" \
   --setopt=install_weak_deps=False \
@@ -48,14 +46,14 @@ dnf -y --installroot="${FS_PREFIX}" \
     xfsprogs xxhash \
     zip zram-generator-defaults
 
-mkdir -p "${FS_PREFIX}"/etc/yum.repos.d "${FS_PREFIX}"/etc/pki/rpm-gpg
-cp -a /etc/yum.repos.d/. $FS_PREFIX/etc/yum.repos.d/
-cp -a /etc/pki/rpm-gpg/. $FS_PREFIX/etc/pki/rpm-gpg/
-ls -la "${FS_PREFIX}"
+mkdir -p /base-rootfs/etc/yum.repos.d /base-rootfs/etc/pki/rpm-gpg
+cp -a /etc/yum.repos.d/. /base-rootfs/etc/yum.repos.d/
+cp -a /etc/pki/rpm-gpg/. /base-rootfs/etc/pki/rpm-gpg/
+ls -la /base-rootfs
 BUILDER
 
 FROM scratch
-COPY --from=builder $FS_PREFIX/ /
+COPY --from=builder /base-rootfs/ /
 
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     df -h && /ctx/base-rootfs.sh
